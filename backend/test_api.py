@@ -88,7 +88,9 @@ def test_quick_analyze():
         response = requests.post(f"{BASE_URL}/analyze/quick", json=analyze_data)
         print("\n🔍 Quick Analyze:")
         print(f"   Status: {response.status_code}")
-        print(f"   Response: {response.json()}")
+        data = response.json()
+        print(f"   Response: {data}")
+        assert "score" in data and isinstance(data["score"], int)
         return response.status_code == 200
     except Exception as e:
         print(f"❌ Quick Analyze Failed: {e}")

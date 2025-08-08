@@ -18,7 +18,10 @@ def get_all_links(base_url):
         soup = BeautifulSoup(response.text, 'html.parser')
         links = []
         for a in soup.find_all('a', href=True):
-            href = a['href']
+            try:
+                href = a['href']  # type: ignore
+            except (KeyError, TypeError):
+                href = None
             if href and isinstance(href, str):
                 full_url = urljoin(base_url, href)
                 links.append(full_url)

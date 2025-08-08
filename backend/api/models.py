@@ -69,6 +69,7 @@ class MessageResponse(BaseModel):
     message: str
 
 class AnalysisResponse(BaseModel):
-    grade: str
+    score: int
     summary: str
-    analysis_id: str 
+    analysis_id: str
+    formatted_summary_html: Optional[str] = None

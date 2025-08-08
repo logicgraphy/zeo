@@ -59,12 +59,11 @@ class DatabaseService:
         verification_codes.pop(email, None)
     
     @staticmethod
-    def create_analysis(analysis_id: str, url: str, grade: str, summary: str, score: int) -> dict:
+    def create_analysis(analysis_id: str, url: str, summary: str, score: int, status: str = "ready") -> dict:
         analysis_data = {
             "url": url,
-            "grade": grade,
             "summary": summary,
-            "status": "ready",
+            "status": status,
             "score": score
         }
         analysis_db[analysis_id] = analysis_data
@@ -73,6 +72,13 @@ class DatabaseService:
     @staticmethod
     def get_analysis(analysis_id: str) -> dict | None:
         return analysis_db.get(analysis_id)
+    
+    @staticmethod
+    def update_analysis(analysis_id: str, updates: Dict[str, Any]) -> dict | None:
+        if analysis_id in analysis_db:
+            analysis_db[analysis_id].update(updates)
+            return analysis_db[analysis_id]
+        return None
     
     @staticmethod
     def create_steps(analysis_id: str, steps: List[dict]) -> None:

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
 client = OpenAI(
     api_key=os.environ.get("LLAMA_API_KEY"), 

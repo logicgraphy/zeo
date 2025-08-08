@@ -3,6 +3,89 @@ import './App.css';
 
 const API_BASE_URL = 'http://localhost:8000';
 
+// Header Component
+const Header = ({ onLogoClick }) => {
+  return (
+    <header className="app-header-nav">
+      <div className="header-content">
+        <div className="logo" onClick={onLogoClick}>
+          <span className="logo-icon">🚀</span>
+          <span className="logo-text">Force Vector AI</span>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+// Terms & Conditions Modal Component
+const TermsModal = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Terms & Conditions</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <h3>1. Acceptance of Terms</h3>
+          <p>By accessing and using Force Vector AI's analysis service, you accept and agree to be bound by the terms and provision of this agreement.</p>
+          
+          <h3>2. Service Description</h3>
+          <p>Force Vector AI provides automated analysis and recommendations for websites. Our service includes website analysis, grade scoring, and actionable improvement suggestions.</p>
+          
+          <h3>3. Privacy Policy</h3>
+          <p>We collect and process website URLs and email addresses solely for the purpose of providing our analysis service. We do not share your information with third parties without your consent.</p>
+          
+          <h3>4. Limitation of Liability</h3>
+          <p>Force Vector AI provides analysis on an "as is" basis. We make no warranties about the accuracy, reliability, completeness, or timeliness of our analysis results.</p>
+          
+          <h3>5. User Responsibilities</h3>
+          <p>Users are responsible for providing accurate website URLs and maintaining the confidentiality of any account information.</p>
+          
+          <h3>6. Modifications</h3>
+          <p>We reserve the right to modify these terms at any time. Continued use of the service constitutes acceptance of modified terms.</p>
+          
+          <h3>7. Contact Information</h3>
+          <p>For questions about these terms, please contact us at support@forcevector.ai</p>
+        </div>
+        <div className="modal-footer">
+          <button className="modal-button" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Footer Component
+const Footer = () => {
+  const [showTerms, setShowTerms] = useState(false);
+
+  return (
+    <>
+      <footer className="app-footer">
+        <div className="footer-content">
+          <div className="footer-links">
+            <button 
+              className="footer-link" 
+              onClick={() => setShowTerms(true)}
+            >
+              Terms of Service
+            </button>
+            <span className="footer-separator">|</span>
+            <span className="footer-text">© 2025 Force Vector AI. All rights reserved.</span>
+          </div>
+        </div>
+      </footer>
+      <TermsModal 
+        isOpen={showTerms} 
+        onClose={() => setShowTerms(false)} 
+      />
+    </>
+  );
+};
+
 // URL Input Component (Step 1)
 const UrlInputForm = ({ onAnalyze, loading, error }) => {
   const [url, setUrl] = useState('');
@@ -25,7 +108,7 @@ const UrlInputForm = ({ onAnalyze, loading, error }) => {
 
   return (
     <div className="form-container">
-      <h2>Get Your Instant SEO Grade</h2>
+      <h2>Optimize your business for AI</h2>
       <p className="subtitle">Enter your website URL to get a quick analysis</p>
       
       <form onSubmit={handleSubmit} className="url-form">
@@ -52,14 +135,14 @@ const UrlInputForm = ({ onAnalyze, loading, error }) => {
       </form>
       
       <p className="help-text">
-        Get instant insights about your website's SEO performance
+        Assess your website's readiness for AI-driven discovery and search
       </p>
     </div>
   );
 };
 
-// Quick Grade Result Component (Step 2)
-const QuickGradeResult = ({ grade, summary, onRequestReport, loading, error }) => {
+// Quick Score Result Component (Step 2)
+const QuickGradeResult = ({ score, summary, onRequestReport, loading, error }) => {
   const [email, setEmail] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
 
@@ -70,11 +153,11 @@ const QuickGradeResult = ({ grade, summary, onRequestReport, loading, error }) =
     }
   };
 
-  const getGradeColor = (grade) => {
-    if (grade >= 90) return '#4CAF50'; // Green
-    if (grade >= 70) return '#FF9800'; // Orange  
-    if (grade >= 50) return '#FF5722'; // Red-Orange
-    return '#F44336'; // Red
+  const getGradeColor = (value) => {
+    if (value >= 90) return '#4CAF50';
+    if (value >= 70) return '#FF9800';  
+    if (value >= 50) return '#FF5722';
+    return '#F44336';
   };
 
   const getGradeLetter = (grade) => {
@@ -87,14 +170,14 @@ const QuickGradeResult = ({ grade, summary, onRequestReport, loading, error }) =
 
   return (
     <div className="form-container">
-      <h2>Your SEO Grade</h2>
+      <h2>Your AI readiness Grade</h2>
       
       <div className="grade-display">
-        <div className="grade-circle" style={{ borderColor: getGradeColor(grade) }}>
-          <span className="grade-letter" style={{ color: getGradeColor(grade) }}>
-            {getGradeLetter(grade)}
+        <div className="grade-circle" style={{ borderColor: getGradeColor(score) }}>
+          <span className="grade-letter" style={{ color: getGradeColor(score) }}>
+            {getGradeLetter(score)}
           </span>
-          <span className="grade-number">{grade}/100</span>
+          <span className="grade-number">{score}/100</span>
         </div>
       </div>
       
@@ -105,7 +188,7 @@ const QuickGradeResult = ({ grade, summary, onRequestReport, loading, error }) =
       {!showEmailForm ? (
         <div className="email-prompt">
           <h3>Want a detailed report?</h3>
-          <p>Enter your email to receive a comprehensive SEO analysis</p>
+          <p>Enter your email to receive a comprehensive AI readiness analysis</p>
           <button 
             className="email-prompt-button"
             onClick={() => setShowEmailForm(true)}
@@ -128,22 +211,23 @@ const QuickGradeResult = ({ grade, summary, onRequestReport, loading, error }) =
           </div>
           
           {error && <div className="error-message">{error}</div>}
-          
-          <button 
-            type="submit" 
-            className="submit-button" 
-            disabled={loading || !email.trim()}
-          >
-            {loading ? 'Sending...' : 'Send Report'}
-          </button>
-          
-          <button 
-            type="button" 
-            className="cancel-button"
-            onClick={() => setShowEmailForm(false)}
-          >
-            Cancel
-          </button>
+          <div className="button-group">
+            <button 
+              type="submit" 
+              className="submit-button" 
+              disabled={loading || !email.trim()}
+            >
+              {loading ? 'Sending...' : 'Send Report'}
+            </button>
+            
+            <button 
+              type="button" 
+              className="cancel-button"
+              onClick={() => setShowEmailForm(false)}
+            >
+              Cancel
+            </button>
+          </div>          
         </form>
       )}
     </div>
@@ -185,23 +269,24 @@ const EmailVerificationForm = ({ email, onVerify, onResend, loading, error, succ
         
         {error && <div className="error-message">{error}</div>}
         {success && <div className="success-message">{success}</div>}
-        
-        <button 
-          type="submit" 
-          className="submit-button" 
-          disabled={loading || code.length !== 6}
-        >
-          {loading ? 'Verifying...' : 'Verify Email'}
-        </button>
-        
-        <button 
-          type="button" 
-          className="resend-button" 
-          onClick={onResend} 
-          disabled={loading}
-        >
-          Resend Code
-        </button>
+        <div className="button-group">
+          <button 
+            type="submit" 
+            className="submit-button" 
+            disabled={loading || code.length !== 6}
+          >
+            {loading ? 'Verifying...' : 'Verify Email'}
+          </button>
+          
+          <button 
+            type="button" 
+            className="resend-button" 
+            onClick={onResend} 
+            disabled={loading}
+          >
+            Resend Code
+          </button> 
+        </div>        
       </form>
       
       <p className="help-text">
@@ -236,7 +321,7 @@ const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
 
   return (
     <div className="form-container report-container">
-      <h2>Detailed SEO Report</h2>
+      <h2>Detailed AI readiness Report</h2>
       
       <div className="report-summary">
         <div className="score-display">
@@ -312,8 +397,8 @@ const DIYSteps = ({ steps, onUpdateStep, onBack, loading }) => {
 
   return (
     <div className="form-container diy-container">
-      <h2>DIY SEO Improvement Guide</h2>
-      <p className="subtitle">Follow these steps to improve your website's SEO</p>
+      <h2>DIY AI readiness Improvement Guide</h2>
+      <p className="subtitle">Follow these steps to improve your website's AI readiness</p>
       
       {Object.entries(groupedSteps).map(([priority, prioritySteps]) => (
         prioritySteps.length > 0 && (
@@ -402,7 +487,7 @@ const HireForm = ({ url, email, onSubmit, onBack, loading, error, success }) => 
 
   return (
     <div className="form-container hire-container">
-      <h2>Hire SEO Experts</h2>
+      <h2>Hire AI Experts</h2>
       <p className="subtitle">Tell us about your project and we'll get back to you</p>
       
       <form onSubmit={handleSubmit} className="hire-form">
@@ -465,7 +550,7 @@ const HireForm = ({ url, email, onSubmit, onBack, loading, error, success }) => 
             value={formData.message}
             onChange={handleChange}
             rows="4"
-            placeholder="Describe your SEO goals and any specific challenges..."
+            placeholder="Describe your AI readiness goals and any specific challenges..."
           />
         </div>
         
@@ -498,7 +583,7 @@ function App() {
   const [currentStep, setCurrentStep] = useState('urlInput');
   const [url, setUrl] = useState('');
   const [analysisId, setAnalysisId] = useState(null);
-  const [grade, setGrade] = useState(null);
+  const [score, setScore] = useState(null);
   const [summary, setSummary] = useState('');
   const [email, setEmail] = useState('');
   const [reportData, setReportData] = useState(null);
@@ -506,6 +591,21 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Reset to home function
+  const resetToHome = () => {
+    setCurrentStep('urlInput');
+    setUrl('');
+    setAnalysisId(null);
+    setScore(null);
+    setSummary('');
+    setEmail('');
+    setReportData(null);
+    setSteps([]);
+    setLoading(false);
+    setError('');
+    setSuccess('');
+  };
 
   // API call function
   const apiCall = async (endpoint, method = 'GET', body = null) => {
@@ -542,7 +642,7 @@ function App() {
     
     try {
       const result = await apiCall('/analyze/quick', 'POST', { url: inputUrl });
-      setGrade(result.grade);
+      setScore(result.score);
       setSummary(result.summary);
       setAnalysisId(result.analysis_id);
       setCurrentStep('quickGrade');
@@ -661,7 +761,7 @@ function App() {
       case 'quickGrade':
         return (
           <QuickGradeResult 
-            grade={grade}
+            score={score}
             summary={summary}
             onRequestReport={handleRequestReport}
             loading={loading}
@@ -714,41 +814,13 @@ function App() {
     }
   };
 
-  const getStepNumber = () => {
-    const stepMap = {
-      'urlInput': 1,
-      'quickGrade': 2,
-      'verifyEmail': 3,
-      'detailedReport': 4,
-      'diySteps': 5,
-      'hireForm': 5
-    };
-    return stepMap[currentStep] || 1;
-  };
-
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>SEO Analyzer</h1>
-        <div className="step-indicator">
-          <div className={`step ${getStepNumber() >= 1 ? 'completed' : ''} ${getStepNumber() === 1 ? 'active' : ''}`}>
-            1. Analyze
-          </div>
-          <div className={`step ${getStepNumber() >= 2 ? 'completed' : ''} ${getStepNumber() === 2 ? 'active' : ''}`}>
-            2. Grade
-          </div>
-          <div className={`step ${getStepNumber() >= 3 ? 'completed' : ''} ${getStepNumber() === 3 ? 'active' : ''}`}>
-            3. Verify
-          </div>
-          <div className={`step ${getStepNumber() >= 4 ? 'completed' : ''} ${getStepNumber() === 4 ? 'active' : ''}`}>
-            4. Report
-          </div>
-          <div className={`step ${getStepNumber() >= 5 ? 'completed' : ''} ${getStepNumber() === 5 ? 'active' : ''}`}>
-            5. Action
-          </div>
-        </div>
+      <Header onLogoClick={resetToHome} />
+      <main className="App-main">
         {renderCurrentStep()}
-      </header>
+      </main>
+      <Footer />
     </div>
   );
 }
