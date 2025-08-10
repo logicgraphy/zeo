@@ -6,7 +6,7 @@ users_db: Dict[str, dict] = {}
 verification_codes: Dict[str, dict] = {}
 analysis_db: Dict[str, dict] = {}
 reports_db: Dict[str, dict] = {}
-steps_db: Dict[str, List[dict]] = {}  # Fixed type: analysis_id -> list of steps
+# steps removed from workflow
 hire_requests_db: Dict[str, dict] = {}
 contact_requests_db: Dict[str, dict] = {}
 
@@ -82,21 +82,7 @@ class DatabaseService:
         return None
     
     @staticmethod
-    def create_steps(analysis_id: str, steps: List[dict]) -> None:
-        steps_db[analysis_id] = steps
-    
-    @staticmethod
-    def get_steps(analysis_id: str) -> List[dict]:
-        return steps_db.get(analysis_id, [])
-    
-    @staticmethod
-    def update_step(step_id: str, completed: bool) -> dict | None:
-        for analysis_id, steps in steps_db.items():
-            for step in steps:
-                if step["id"] == step_id:
-                    step["completed"] = completed
-                    return step
-        return None
+    # Steps-related methods removed
     
     @staticmethod
     def create_hire_request(request_id: str, hire_data: dict) -> dict:

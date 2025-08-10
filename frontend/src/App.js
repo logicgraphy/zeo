@@ -229,7 +229,7 @@ const UrlInputForm = ({ onAnalyze, loading, error }) => {
 
   return (
     <div className="form-container">
-      <h2>Optimize your business for AI</h2>
+      <h2>Optimize your website for AI</h2>
       <p className="subtitle">Enter your website URL to get a quick analysis</p>
       
       <form onSubmit={handleSubmit} className="url-form">
@@ -455,23 +455,28 @@ const EmailVerificationForm = ({ email, onVerify, onResend, loading, error, succ
         </div>        
       </form>
       
-      <p className="help-text">
-        Check your console for the verification code (demo mode)
-      </p>
+      {loading && success && (
+        <div className="loading-spinner" style={{ marginTop: '16px' }}>
+          <div className="spinner"></div>
+          <p>{success}</p>
+        </div>
+      )}
+
+      <p className="help-text">Check your console for the verification code (demo mode)</p>
     </div>
   );
 };
 
-// Detailed Report Component (Step 5 & 6)
+// Detailed Report Component
 const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
   if (loading) {
     return (
       <div className="form-container">
         <h2>Generating Your Report</h2>
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Analyzing your website in detail...</p>
+        <div className="wait-indicator" aria-live="polite" aria-busy="true">
+          <img src="/img/wait.png" alt="Loading" className="wait-icon wait-icon--large" />
         </div>
+        <p style={{ marginTop: '12px' }}>Analyzing your website in detail...</p>
       </div>
     );
   }
@@ -485,48 +490,205 @@ const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
     );
   }
 
+  const meta = reportData.meta || {};
+  const exec = reportData.executive_summary || {};
+  const overall = reportData.overall_findings || {};
+  const strengths = reportData.strengths || {};
+  const weaknesses = reportData.weaknesses || {};
+  const implications = reportData.implications_for_aeo || {};
+  const recommendations = reportData.recommendations || [];
+  const checklist = reportData.quick_win_checklist || [];
+  const pageScores = reportData.page_scores || [];
+  const abTests = reportData.ab_testing_plan || [];
+  const kpis = reportData.kpis_to_monitor || [];
+
   return (
     <div className="form-container report-container">
-      <h2>Detailed AI readiness Report</h2>
+      <h2>{meta.report_title || 'AEO Site Report'}</h2>
       
       <div className="report-summary">
         <div className="score-display">
-          <h3>Overall Score: {reportData.score}/100</h3>
+          <h3>Overall Score: {meta.overall_score ?? '-'} / 100</h3>
         </div>
-        
-        {reportData.report_url && (
-          <div className="report-link">
-            <a href={reportData.report_url} target="_blank" rel="noopener noreferrer">
-              View Full Report
-            </a>
-          </div>
-        )}
+        <p><strong>Scope:</strong> {meta.scope || '—'}</p>
+        <p><strong>Analyzed At:</strong> {meta.analyzed_at || '—'}</p>
       </div>
 
-      <div className="issues-summary">
-        <h3>Key Issues Found</h3>
-        {reportData.issues && reportData.issues.length > 0 ? (
+      <section className="issues-summary">
+        <h3>Executive Summary</h3>
+        <p>{exec.summary_paragraph}</p>
+        {Array.isArray(exec.highlights) && exec.highlights.length > 0 && (
           <ul className="issues-list">
-            {reportData.issues.slice(0, 5).map((issue, index) => (
-              <li key={index} className={`issue issue-${issue.priority}`}>
-                <span className="issue-text">{issue.text}</span>
-                <span className="issue-priority">{issue.priority}</span>
+            {exec.highlights.map((h, i) => (
+              <li key={i} className="issue"><span className="issue-text">{h}</span></li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="issues-summary">
+        <h3>Overall Findings</h3>
+        <ul className="issues-list">
+          <li className="issue"><span className="issue-text">Content Quality: {overall.content_quality?.score ?? '-'} / 5 — {overall.content_quality?.notes || ''}</span></li>
+          <li className="issue"><span className="issue-text">Structure: {overall.structure?.score ?? '-'} / 5 — {overall.structure?.notes || ''}</span></li>
+          <li className="issue"><span className="issue-text">Authority Signals: {overall.authority_signals?.score ?? '-'} / 5 — {overall.authority_signals?.notes || ''}</span></li>
+        </ul>
+        {overall.impact && <p><strong>Impact:</strong> {overall.impact}</p>}
+        {Array.isArray(overall.common_themes) && overall.common_themes.length > 0 && (
+          <>
+            <h4>Common Themes</h4>
+            <ul className="issues-list">
+              {overall.common_themes.map((t, i) => (
+                <li key={i} className="issue"><span className="issue-text">{t}</span></li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section className="issues-summary">
+        <h3>Strengths</h3>
+        <div className="two-col">
+          <div>
+            <h4>Brand & Domain Trust</h4>
+            <ul className="issues-list">{(strengths.brand_domain_trust || []).map((s, i) => <li key={i} className="issue"><span className="issue-text">{s}</span></li>)}</ul>
+          </div>
+          <div>
+            <h4>Navigation & Layout</h4>
+            <ul className="issues-list">{(strengths.navigation_layout || []).map((s, i) => <li key={i} className="issue"><span className="issue-text">{s}</span></li>)}</ul>
+          </div>
+          <div>
+            <h4>Technical Signals</h4>
+            <ul className="issues-list">{(strengths.technical_signals || []).map((s, i) => <li key={i} className="issue"><span className="issue-text">{s}</span></li>)}</ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="issues-summary">
+        <h3>Weaknesses</h3>
+        <div className="two-col">
+          <div>
+            <h4>Content Depth</h4>
+            <ul className="issues-list">{(weaknesses.content_depth || []).map((w, i) => <li key={i} className="issue"><span className="issue-text">{w}</span></li>)}</ul>
+          </div>
+          <div>
+            <h4>Authority & Trust</h4>
+            <ul className="issues-list">{(weaknesses.authority_trust || []).map((w, i) => <li key={i} className="issue"><span className="issue-text">{w}</span></li>)}</ul>
+          </div>
+          <div>
+            <h4>Semantic & Accessibility</h4>
+            <ul className="issues-list">{(weaknesses.semantic_accessibility || []).map((w, i) => <li key={i} className="issue"><span className="issue-text">{w}</span></li>)}</ul>
+          </div>
+          <div>
+            <h4>UX Friction</h4>
+            <ul className="issues-list">{(weaknesses.ux_friction || []).map((w, i) => <li key={i} className="issue"><span className="issue-text">{w}</span></li>)}</ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="issues-summary">
+        <h3>Implications for AEO</h3>
+        <p>{implications.overview}</p>
+        <ul className="issues-list">{(implications.bullets || []).map((b, i) => <li key={i} className="issue"><span className="issue-text">{b}</span></li>)}</ul>
+      </section>
+
+      <section className="issues-summary">
+        <h3>Recommendations</h3>
+        {recommendations.length > 0 ? (
+          <ul className="issues-list">
+            {recommendations.map((rec, i) => (
+              <li key={i} className="issue">
+                <span className="issue-text"><strong>[{rec.priority?.toUpperCase?.() || rec.priority}]</strong> {rec.action}</span>
+                <div className="meta-inline">Owner: {rec.owner} • Effort: {rec.effort} • Impact: {rec.impact}</div>
+                {rec.rationale && <div className="small-note">Why: {rec.rationale}</div>}
+                {Array.isArray(rec.success_metrics) && rec.success_metrics.length > 0 && (
+                  <div className="small-note">Success: {rec.success_metrics.join(', ')}</div>
+                )}
               </li>
             ))}
           </ul>
         ) : (
-          <p>Great! No major issues found.</p>
+          <p>No recommendations.</p>
         )}
-      </div>
+      </section>
+
+      <section className="issues-summary">
+        <h3>Quick Win Checklist</h3>
+        {checklist.length > 0 ? (
+          <ul className="issues-list">
+            {checklist.map((c, i) => (
+              <li key={i} className="issue">
+                <span className="issue-text">{c.action}</span>
+                <div className="meta-inline">Status: {c.status} • Target: {c.target_metric}</div>
+                {c.why_it_matters && <div className="small-note">{c.why_it_matters}</div>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No checklist items.</p>
+        )}
+      </section>
+
+      <section className="issues-summary">
+        <h3>Analyzed Pages</h3>
+        {pageScores.length > 0 ? (
+          <ul className="issues-list">
+            {pageScores.map((pr, index) => (
+              <li key={index} className="issue">
+                <span className="issue-text">
+                  <a href={pr.url} target="_blank" rel="noreferrer">{pr.url}</a>
+                </span>
+                <span className="issue-priority">{pr.score}/100</span>
+                {Array.isArray(pr.key_observations) && pr.key_observations.length > 0 && (
+                  <ul className="sub-list">
+                    {pr.key_observations.map((o, j) => (
+                      <li key={j} className="issue"><span className="issue-text">{o}</span></li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No page-level details available.</p>
+        )}
+      </section>
+
+      <section className="issues-summary">
+        <h3>Bottom Line</h3>
+        <p>{reportData.bottom_line}</p>
+      </section>
+
+      <section className="issues-summary">
+        <h3>A/B Testing Plan</h3>
+        {abTests.length > 0 ? (
+          <ul className="issues-list">
+            {abTests.map((t, i) => (
+              <li key={i} className="issue">
+                <span className="issue-text"><strong>Hypothesis:</strong> {t.hypothesis}</span>
+                <div className="small-note">Changes: {(t.variant_changes || []).join(', ')}</div>
+                <div className="meta-inline">Primary: {t.primary_metric} • Secondary: {(t.secondary_metrics || []).join(', ')} • Duration: {t.duration_weeks} weeks</div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No A/B tests proposed.</p>
+        )}
+      </section>
+
+      <section className="issues-summary">
+        <h3>KPIs to Monitor</h3>
+        <ul className="issues-list">{(kpis || []).map((k, i) => <li key={i} className="issue"><span className="issue-text">{k}</span></li>)}</ul>
+      </section>
 
       <div className="action-buttons">
         <h3>How would you like to proceed?</h3>
         <div className="button-group">
           <button className="diy-button" onClick={onChooseDIY}>
-            <span className="button-icon">🔧</span>
+            <span className="button-icon">🔍</span>
             <span className="button-text">
-              <strong>Fix it Myself</strong>
-              <small>Get step-by-step guidance</small>
+              <strong>View Details</strong>
+              <small>See page scores and summary</small>
             </span>
           </button>
           
@@ -543,76 +705,7 @@ const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
   );
 };
 
-// DIY Steps Component (Step 7)
-const DIYSteps = ({ steps, onUpdateStep, onBack, loading }) => {
-  const groupedSteps = {
-    high: steps.filter(step => step.priority === 'high'),
-    medium: steps.filter(step => step.priority === 'medium'),
-    low: steps.filter(step => step.priority === 'low')
-  };
-
-  const handleStepToggle = (stepId, completed) => {
-    onUpdateStep(stepId, completed);
-  };
-
-  const priorityLabels = {
-    high: { label: 'High Priority', color: '#F44336' },
-    medium: { label: 'Medium Priority', color: '#FF9800' },
-    low: { label: 'Low Priority', color: '#4CAF50' }
-  };
-
-  return (
-    <div className="form-container diy-container">
-      <h2>DIY AI readiness Improvement Guide</h2>
-      <p className="subtitle">Follow these steps to improve your website's AI readiness</p>
-      
-      {Object.entries(groupedSteps).map(([priority, prioritySteps]) => (
-        prioritySteps.length > 0 && (
-          <div key={priority} className="priority-section">
-            <h3 
-              className="priority-header"
-              style={{ color: priorityLabels[priority].color }}
-            >
-              {priorityLabels[priority].label} ({prioritySteps.length} items)
-            </h3>
-            
-            <div className="steps-list">
-              {prioritySteps.map(step => (
-                <div key={step.id} className="step-item">
-                  <label className="step-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={step.completed}
-                      onChange={(e) => handleStepToggle(step.id, e.target.checked)}
-                      disabled={loading}
-                    />
-                    <span className="checkmark"></span>
-                  </label>
-                  
-                  <div className={`step-content ${step.completed ? 'completed' : ''}`}>
-                    <p className="step-text">{step.step_text}</p>
-                    {step.impact && (
-                      <p className="step-impact">Expected Impact: {step.impact}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      ))}
-      
-      <div className="action-buttons">
-        <button className="download-button">
-          📄 Download as PDF
-        </button>
-        <button className="back-button" onClick={onBack}>
-          ← Back to Report
-        </button>
-      </div>
-    </div>
-  );
-};
+// Steps workflow removed
 
 // Hire Form Component (Step 8)
 const HireForm = ({ url, email, onSubmit, onBack, loading, error, success }) => {
@@ -755,7 +848,6 @@ function App() {
   const [quickCategories, setQuickCategories] = useState(null);
   const [email, setEmail] = useState('');
   const [reportData, setReportData] = useState(null);
-  const [steps, setSteps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -769,7 +861,6 @@ function App() {
     setAnalyzedUrl('');
     setEmail('');
     setReportData(null);
-    setSteps([]);
     setLoading(false);
     setError('');
     setSuccess('');
@@ -857,19 +948,13 @@ function App() {
     setLoading(true);
     setError('');
     setSuccess('');
-    
     try {
       await apiCall('/auth/verify-email', 'POST', { email, code });
       setSuccess('Email verified! Generating your report...');
       
-      // Fetch the detailed report
+      // Fetch the detailed report (now includes page_results and summary)
       const report = await apiCall(`/report/${analysisId}`);
       setReportData(report);
-      
-      // Fetch DIY steps
-      const stepsResult = await apiCall(`/report/${analysisId}/steps`);
-      setSteps(stepsResult.steps || []);
-      
       setCurrentStep('detailedReport');
     } catch (err) {
       setError(err.message);
@@ -894,17 +979,7 @@ function App() {
     }
   };
 
-  // Step 7: Handle step completion update
-  const handleUpdateStep = async (stepId, completed) => {
-    try {
-      const updatedStep = await apiCall(`/steps/${stepId}`, 'PATCH', { completed });
-      setSteps(steps.map(step => 
-        step.id === stepId ? { ...step, completed: updatedStep.completed } : step
-      ));
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  // Steps removed
 
   // Step 8: Handle hire form submission
   const handleHireSubmit = async (hireData) => {
@@ -926,7 +1001,7 @@ function App() {
 
   // Navigation helpers
   const goToReport = () => setCurrentStep('detailedReport');
-  const goToDIY = () => setCurrentStep('diySteps');
+  const goToDIY = () => setCurrentStep('detailedReport');
   const goToHire = () => setCurrentStep('hireForm');
 
   // Render current step
@@ -971,15 +1046,7 @@ function App() {
             loading={loading}
           />
         );
-      case 'diySteps':
-        return (
-          <DIYSteps 
-            steps={steps}
-            onUpdateStep={handleUpdateStep}
-            onBack={goToReport}
-            loading={loading}
-          />
-        );
+      // steps workflow removed
       case 'hireForm':
         return (
           <HireForm 

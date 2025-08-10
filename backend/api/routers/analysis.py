@@ -29,8 +29,8 @@ LLM_MODEL_NAME = os.environ.get("OPENAI_MODEL", "gpt-5-nano")
 
 from ..models import (
     QuickAnalyzeRequest, ReportRequest, AnalysisResponse,
-    ReportStatus, ReportResponse, StepsResponse, StepResponse,
-    StepUpdate, MessageResponse, EmailVerification,
+    ReportStatus, AEOReport,
+    MessageResponse, EmailVerification,
     QuickAnalyzeResponse, CategoryScore
 )
 from ..utils import generate_verification_code, send_verification_email
@@ -511,19 +511,16 @@ async def quick_analyze(req: QuickAnalyzeRequest):
     except Exception as e:
         print(f"Error in quick_analyze: {e}")
         default_reason = "Analysis error. Using default values."
-        score = 60
+        score = 00
         DatabaseService.create_analysis(analysis_id, req.url, default_reason, score)
         return QuickAnalyzeResponse(
             analysis_id=analysis_id,
             overall_score=score,
             url=req.url,
-            content_quality=CategoryScore(score=3, reason=default_reason),
-            structure_optimization=CategoryScore(score=3, reason=default_reason),
-            authority_trust=CategoryScore(score=3, reason=default_reason),
+            content_quality=CategoryScore(score=0, reason=default_reason),
+            structure_optimization=CategoryScore(score=0, reason=default_reason),
+            authority_trust=CategoryScore(score=0, reason=default_reason),
         )
-
-
-# Removed deep analyze endpoint not used by the frontend
 
 
 @router.post("/report/request", response_model=MessageResponse)
@@ -543,66 +540,110 @@ async def request_report(req: ReportRequest):
     return MessageResponse(message="Verification code sent to email")
 
 
-# Removed analyze status and details endpoints not used by the frontend
 
-
-# Removed manual refresh endpoint not used by the frontend
-
-# Removed report status endpoint not used by the frontend
-
-@router.get("/report/{analysis_id}", response_model=ReportResponse)
+@router.get("/report/{analysis_id}", response_model=AEOReport)
 async def get_report(analysis_id: str):
-    """Get detailed report for an analysis"""
+    """Run full-site analysis for the given analysis_id and return a detailed report."""
     data = DatabaseService.get_analysis(analysis_id)
     if not data:
         raise HTTPException(status_code=404, detail="Report not found")
     
-    return ReportResponse(
-        report_id=analysis_id,
-        score=data.get("score", 80),
-        issues=[
-            {"priority": "high", "text": "Add meta descriptions"},
-            {"priority": "medium", "text": "Optimize images"}
-        ],
-        report_url=None
-    )
+    # Perform full-site analysis synchronously for now
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Analysis URL missing")
 
-@router.get("/report/{analysis_id}/steps", response_model=StepsResponse)
-async def get_steps(analysis_id: str):
-    """Get improvement steps for an analysis"""
-    # Create dummy steps if they don't exist
-    existing_steps = DatabaseService.get_steps(analysis_id)
-    if not existing_steps:
-        steps = [
-            {"id": "step1", "priority": "high", "text": "Fix H1 tags", "completed": False},
-            {"id": "step2", "priority": "medium", "text": "Add alt attributes", "completed": False}
-        ]
-        DatabaseService.create_steps(analysis_id, steps)
-    else:
-        steps = existing_steps
-    
-    step_responses = [
-        StepResponse(
-            id=step["id"],
-            priority=step["priority"],
-            text=step["text"],
-            completed=step["completed"]
-        )
-        for step in steps
+    urls = crawl_website(url, max_pages=5)
+    if not urls:
+        urls = [url]
+
+    page_results: List[dict] = []
+    for page_url in urls:
+        content = extract_structured_content(page_url)
+        if not content:
+            continue
+        llm_json, _ = analyze_content_with_llm(content)
+        structural_scores = score_aeo_features(content)
+        score = calculate_score_from_signals(llm_json, structural_scores.get("total_score", 0))
+        summary = create_summary_from_analysis(page_url, llm_json, structural_scores)
+        page_results.append({"url": page_url, "score": score, "summary": summary})
+
+    if not page_results:
+        raise HTTPException(status_code=400, detail="Unable to generate report from the site content")
+
+    average_score = round(sum(r["score"] for r in page_results) / len(page_results))
+    final_summary = summarize_reports([r["summary"] for r in page_results], url)
+
+    # Build RAW_REPORT string
+    raw_lines = [
+        f"Overall Score: {average_score}",
+        f"URL: {url}",
+        "\nPage Results:",
     ]
-    
-    return StepsResponse(steps=step_responses)
+    for r in page_results:
+        raw_lines.append(f"- {r['url']} — {r['score']}/100\n  {r['summary']}")
+    raw_lines.append("\nAggregate Summary:\n" + final_summary)
+    raw_report = "\n".join(raw_lines)
 
-@router.patch("/steps/{step_id}", response_model=StepResponse)
-async def update_step(step_id: str, update: StepUpdate):
-    """Update the completion status of a step"""
-    updated_step = DatabaseService.update_step(step_id, update.completed)
-    if not updated_step:
-        raise HTTPException(status_code=404, detail="Step not found")
-    
-    return StepResponse(
-        id=updated_step["id"],
-        priority=updated_step["priority"],
-        text=updated_step["text"],
-        completed=updated_step["completed"]
-    ) 
+    # Format with LLM per strict JSON schema
+    prompt = (
+        "You are an expert AEO report formatter. Convert the following unstructured AEO report into STRICT JSON that matches the schema below. Do not include explanations, markdown, or code fences—return JSON ONLY.\n\n"
+        "INPUT_REPORT:\n{{RAW_REPORT}}\n\n"
+        "REQUIRED JSON SCHEMA (TypeShape):\n{\n  \"meta\": {\n    \"report_title\": \"string\",\n    \"scope\": \"string\",\n    \"analyzed_at\": \"string (ISO 8601 date)\",\n    \"overall_score\": \"number [0,100]\",\n    \"analyst\": \"string\",\n    \"tool_version\": \"string\"\n  },\n  \"executive_summary\": {\n    \"summary_paragraph\": \"string\",\n    \"highlights\": [\"string\", \"...\"]\n  },\n  \"overall_findings\": {\n    \"content_quality\": { \"score\": \"number [1,5]\", \"notes\": \"string\" },\n    \"structure\":       { \"score\": \"number [1,5]\", \"notes\": \"string\" },\n    \"authority_signals\": { \"score\": \"number [1,5]\", \"notes\": \"string\" },\n    \"impact\": \"string\",\n    \"common_themes\": [\"string\", \"...\"]\n  },\n  \"strengths\": {\n    \"brand_domain_trust\": [\"string\", \"...\"],\n    \"navigation_layout\": [\"string\", \"...\"],\n    \"technical_signals\": [\"string\", \"...\"]\n  },\n  \"weaknesses\": {\n    \"content_depth\": [\"string\", \"...\"],\n    \"authority_trust\": [\"string\", \"...\"],\n    \"semantic_accessibility\": [\"string\", \"...\"],\n    \"ux_friction\": [\"string\", \"...\"]\n  },\n  \"implications_for_aeo\": {\n    \"overview\": \"string\",\n    \"bullets\": [\"string\", \"...\"]\n  },\n  \"recommendations\": [\n    {\n      \"priority\": \"high|medium|long\",\n      \"action\": \"string\",\n      \"rationale\": \"string\",\n      \"owner\": \"content|engineering|seo|design|product|analytics\",\n      \"effort\": \"S|M|L\",\n      \"impact\": \"S|M|L\",\n      \"success_metrics\": [\"string\", \"...\"]\n    }\n  ],\n  \"quick_win_checklist\": [\n    {\n      \"action\": \"string\",\n      \"why_it_matters\": \"string\",\n      \"status\": \"todo|in_progress|done\",\n      \"target_metric\": \"string\"\n    }\n  ],\n  \"page_scores\": [\n    {\n      \"url\": \"string (absolute or hash-anchored)\",\n      \"score\": \"number [0,100]\",\n      \"key_observations\": [\"string\", \"...\"]\n    }\n  ],\n  \"bottom_line\": \"string\",\n  \"ab_testing_plan\": [\n    {\n      \"hypothesis\": \"string\",\n      \"variant_changes\": [\"string\", \"...\"],\n      \"primary_metric\": \"string\",\n      \"secondary_metrics\": [\"string\", \"...\"],\n      \"duration_weeks\": \"number\"\n    }\n  ],\n  \"kpis_to_monitor\": [\"string\", \"...\"]\n}\n\nTRANSFORMATION RULES:\n1) Populate all fields from INPUT_REPORT; if a field is missing, infer briefly (1–2 sentences) or use an empty array [] if truly not present. Never omit required top-level keys.\n2) Clamp numeric scores to schema ranges. Convert textual scores (e.g., “2/5”) to numbers.\n3) Use concise, stakeholder-friendly language. Bullet points should be short, actionable statements.\n4) Preserve page list and scores exactly when present; normalize URLs; carry forward any anchors.\n5) Keep \"recommendations\" prioritized and specific; assign likely \"owner\" and rough \"effort/impact\".\n6) Dates must be ISO 8601. If missing, set to today's date in UTC.\n7) Return VALID JSON ONLY. No comments, no trailing commas, no markdown.\n"
+    ).replace("{{RAW_REPORT}}", raw_report)
+
+    def build_fallback() -> dict:
+        today_iso = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        return {
+            "meta": {
+                "report_title": "AEO Site Report",
+                "scope": url,
+                "analyzed_at": today_iso,
+                "overall_score": average_score,
+                "analyst": "AI",
+                "tool_version": "1.0"
+            },
+            "executive_summary": {
+                "summary_paragraph": final_summary,
+                "highlights": []
+            },
+            "overall_findings": {
+                "content_quality": {"score": 3, "notes": ""},
+                "structure": {"score": 3, "notes": ""},
+                "authority_signals": {"score": 3, "notes": ""},
+                "impact": "",
+                "common_themes": []
+            },
+            "strengths": {"brand_domain_trust": [], "navigation_layout": [], "technical_signals": []},
+            "weaknesses": {"content_depth": [], "authority_trust": [], "semantic_accessibility": [], "ux_friction": []},
+            "implications_for_aeo": {"overview": "", "bullets": []},
+            "recommendations": [],
+            "quick_win_checklist": [],
+            "page_scores": [{"url": r["url"], "score": r["score"], "key_observations": []} for r in page_results],
+            "bottom_line": final_summary,
+            "ab_testing_plan": [],
+            "kpis_to_monitor": []
+        }
+
+    if not client:
+        return build_fallback()
+
+    try:
+        response = client.chat.completions.create(
+            model=LLM_MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        content = response.choices[0].message.content or "{}"
+        data = json.loads(content)
+        # Validate against schema; if invalid, fallback below
+        try:
+            validated = AEOReport(**data)
+            return json.loads(validated.model_dump_json())
+        except Exception as ve:
+            print(f"Validation of LLM JSON failed: {ve}")
+            return build_fallback()
+    except Exception as e:
+        print(f"Formatting failed, returning fallback schema: {e}")
+        return build_fallback()
+
+# Steps endpoint removed from workflow
