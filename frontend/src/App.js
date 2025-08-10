@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
+import { useConsent } from './consent/ConsentContext';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -58,9 +59,111 @@ const TermsModal = ({ isOpen, onClose }) => {
   );
 };
 
+// Contact Us Modal Component
+const ContactModal = ({ isOpen, onClose }) => {
+  const { preferences } = useConsent();
+  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [captchaChecked, setCaptchaChecked] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  if (!isOpen) return null;
+
+  const updateField = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    if (!captchaChecked) {
+      setError('Please complete the captcha before submitting.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Consent-Do-Not-Sell': preferences?.doNotSell ? '1' : '0',
+          'X-Consent-Functional': preferences?.functional ? '1' : '0',
+          'X-Consent-Analytics': preferences?.analytics ? '1' : '0',
+          'X-Consent-Marketing': preferences?.marketing ? '1' : '0',
+          'Sec-GPC': (typeof navigator !== 'undefined' && navigator.globalPrivacyControl) ? '1' : '0',
+        },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || 'Failed to submit contact form');
+      setSuccess(data?.message || 'Thanks! We will reach out soon.');
+      setForm({ name: '', email: '', subject: '', message: '' });
+      setCaptchaChecked(false);
+    } catch (err) {
+      setError(err.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Contact Us</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <form onSubmit={handleSubmit}>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="cu-name">Name *</label>
+                <input id="cu-name" name="name" type="text" value={form.name} onChange={updateField} required placeholder="Your full name" />
+              </div>
+              <div className="form-group">
+                <label htmlFor="cu-email">Email *</label>
+                <input id="cu-email" name="email" type="email" value={form.email} onChange={updateField} required placeholder="you@example.com" />
+              </div>
+            </div>
+            <div className="form-group">
+              <label htmlFor="cu-subject">Subject</label>
+              <input id="cu-subject" name="subject" type="text" value={form.subject} onChange={updateField} placeholder="How can we help?" />
+            </div>
+            <div className="form-group">
+              <label htmlFor="cu-message">Message *</label>
+              <textarea id="cu-message" name="message" rows="4" value={form.message} onChange={updateField} required placeholder="Tell us a bit about your needs..." />
+            </div>
+
+            <div className="captcha-box">
+              <label className="captcha-label">
+                <input type="checkbox" checked={captchaChecked} onChange={(e) => setCaptchaChecked(e.target.checked)} />
+                <span>I’m not a robot</span>
+              </label>
+            </div>
+
+            {error && <div className="error-message">{error}</div>}
+            {success && <div className="success-message">{success}</div>}
+
+            <div className="button-group">
+              <button type="submit" className="submit-button" disabled={loading || !form.name || !form.email || !form.message || !captchaChecked}>
+                {loading ? 'Sending...' : 'Send Message'}
+              </button>
+              <button type="button" className="cancel-button" onClick={onClose}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Footer Component
 const Footer = () => {
+  const { openPrivacyCenter } = useConsent();
   const [showTerms, setShowTerms] = useState(false);
+  const [showContact, setShowContact] = useState(false);
 
   return (
     <>
@@ -74,6 +177,20 @@ const Footer = () => {
               Terms of Service
             </button>
             <span className="footer-separator">|</span>
+            <button
+              className="footer-link"
+              onClick={openPrivacyCenter}
+            >
+              Privacy & Cookie Settings
+            </button>
+            <span className="footer-separator">|</span>
+            <button
+              className="footer-link"
+              onClick={() => setShowContact(true)}
+            >
+              Contact Us
+            </button>
+            <span className="footer-separator">|</span>
             <span className="footer-text">© 2025 Force Vector AI. All rights reserved.</span>
           </div>
         </div>
@@ -81,6 +198,10 @@ const Footer = () => {
       <TermsModal 
         isOpen={showTerms} 
         onClose={() => setShowTerms(false)} 
+      />
+      <ContactModal 
+        isOpen={showContact}
+        onClose={() => setShowContact(false)}
       />
     </>
   );
@@ -125,6 +246,12 @@ const UrlInputForm = ({ onAnalyze, loading, error }) => {
         
         {error && <div className="error-message">{error}</div>}
         
+        {loading && (
+          <div className="wait-indicator" aria-live="polite" aria-busy="true">
+            <img src="/img/wait.png" alt="Loading" className="wait-icon wait-icon--large" />
+          </div>
+        )}
+
         <button 
           type="submit" 
           className="analyze-button" 
@@ -142,7 +269,7 @@ const UrlInputForm = ({ onAnalyze, loading, error }) => {
 };
 
 // Quick Score Result Component (Step 2)
-const QuickGradeResult = ({ score, summary, onRequestReport, loading, error }) => {
+const QuickGradeResult = ({ score, url, categories, onRequestReport, loading, error }) => {
   const [email, setEmail] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
 
@@ -168,9 +295,22 @@ const QuickGradeResult = ({ score, summary, onRequestReport, loading, error }) =
     return 'F';
   };
 
+  const cat = categories || {};
+
+  const getCatColor = (v) => {
+    if (v >= 5) return '#4CAF50';
+    if (v >= 4) return '#8BC34A';
+    if (v >= 3) return '#FFB300';
+    if (v >= 2) return '#FF7043';
+    return '#F44336';
+  };
+
   return (
     <div className="form-container">
       <h2>Your AI readiness Grade</h2>
+      {url && (
+        <p className="grade-url"><a href={url} target="_blank" rel="noreferrer">{url}</a></p>
+      )}
       
       <div className="grade-display">
         <div className="grade-circle" style={{ borderColor: getGradeColor(score) }}>
@@ -181,14 +321,40 @@ const QuickGradeResult = ({ score, summary, onRequestReport, loading, error }) =
         </div>
       </div>
       
-      <div className="summary-box">
-        <p>{summary}</p>
+      <div className="category-grid">
+        <div className="category-card">
+          <div className="category-header">
+            <span>Content Quality</span>
+            <span className="category-score" style={{ color: getCatColor(cat?.content_quality?.score) }}>
+              {cat?.content_quality?.score ?? '-'}&#8239;/&#8239;5
+            </span>
+          </div>
+          <p className="category-reason">{cat?.content_quality?.reason || '—'}</p>
+        </div>
+        <div className="category-card">
+          <div className="category-header">
+            <span>Structure Optimization</span>
+            <span className="category-score" style={{ color: getCatColor(cat?.structure_optimization?.score) }}>
+              {cat?.structure_optimization?.score ?? '-'}&#8239;/&#8239;5
+            </span>
+          </div>
+          <p className="category-reason">{cat?.structure_optimization?.reason || '—'}</p>
+        </div>
+        <div className="category-card">
+          <div className="category-header">
+            <span>Authority & Trust</span>
+            <span className="category-score" style={{ color: getCatColor(cat?.authority_trust?.score) }}>
+              {cat?.authority_trust?.score ?? '-'}&#8239;/&#8239;5
+            </span>
+          </div>
+          <p className="category-reason">{cat?.authority_trust?.reason || '—'}</p>
+        </div>
       </div>
 
       {!showEmailForm ? (
         <div className="email-prompt">
           <h3>Want a detailed report?</h3>
-          <p>Enter your email to receive a comprehensive AI readiness analysis</p>
+          <p>Enter your email to receive your comprehensive AI readiness analysis</p>
           <button 
             className="email-prompt-button"
             onClick={() => setShowEmailForm(true)}
@@ -580,11 +746,13 @@ const HireForm = ({ url, email, onSubmit, onBack, loading, error, success }) => 
 
 // Main App Component
 function App() {
+  const { preferences } = useConsent();
   const [currentStep, setCurrentStep] = useState('urlInput');
   const [url, setUrl] = useState('');
   const [analysisId, setAnalysisId] = useState(null);
   const [score, setScore] = useState(null);
-  const [summary, setSummary] = useState('');
+  const [analyzedUrl, setAnalyzedUrl] = useState('');
+  const [quickCategories, setQuickCategories] = useState(null);
   const [email, setEmail] = useState('');
   const [reportData, setReportData] = useState(null);
   const [steps, setSteps] = useState([]);
@@ -598,7 +766,7 @@ function App() {
     setUrl('');
     setAnalysisId(null);
     setScore(null);
-    setSummary('');
+    setAnalyzedUrl('');
     setEmail('');
     setReportData(null);
     setSteps([]);
@@ -614,6 +782,13 @@ function App() {
         method,
         headers: {
           'Content-Type': 'application/json',
+          // Forward consent to backend so it can honor opt-out regardless of cookies/origin
+          'X-Consent-Do-Not-Sell': preferences?.doNotSell ? '1' : '0',
+          'X-Consent-Functional': preferences?.functional ? '1' : '0',
+          'X-Consent-Analytics': preferences?.analytics ? '1' : '0',
+          'X-Consent-Marketing': preferences?.marketing ? '1' : '0',
+          // Forward GPC where supported
+          'Sec-GPC': (typeof navigator !== 'undefined' && navigator.globalPrivacyControl) ? '1' : '0',
         },
       };
       
@@ -642,8 +817,15 @@ function App() {
     
     try {
       const result = await apiCall('/analyze/quick', 'POST', { url: inputUrl });
-      setScore(result.score);
-      setSummary(result.summary);
+      // New structured response
+      setScore(result.overall_score);
+      setAnalyzedUrl(result.url || inputUrl);
+      setQuickCategories({
+        content_quality: result.content_quality,
+        structure_optimization: result.structure_optimization,
+        authority_trust: result.authority_trust,
+      });
+      // no summary in new quick response
       setAnalysisId(result.analysis_id);
       setCurrentStep('quickGrade');
     } catch (err) {
@@ -762,7 +944,8 @@ function App() {
         return (
           <QuickGradeResult 
             score={score}
-            summary={summary}
+            url={analyzedUrl}
+            categories={quickCategories}
             onRequestReport={handleRequestReport}
             loading={loading}
             error={error}

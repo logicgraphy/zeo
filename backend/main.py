@@ -4,11 +4,62 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from api.routers import auth, users, analysis, hire
+from fastapi import Body
+from api.models import ContactRequest, MessageResponse
+from api.database import DatabaseService
+import uuid
 
 # Load environment variables from .env file
 load_dotenv(override=True)
 
 app = FastAPI(title="Force Vector AI Backend", description="Backend API with email verification")
+
+# Consent extraction middleware (reads consent headers/cookies and attaches to request.state)
+def _parse_bool(value):
+    try:
+        return str(value).lower() in {"1", "true", "yes", "y", "on"}
+    except Exception:
+        return False
+
+@app.middleware("http")
+async def consent_middleware(request: Request, call_next):
+    headers = request.headers
+    consent = {
+        "do_not_sell": _parse_bool(headers.get("x-consent-do-not-sell")),
+        "functional": _parse_bool(headers.get("x-consent-functional")),
+        "analytics": _parse_bool(headers.get("x-consent-analytics")),
+        "marketing": _parse_bool(headers.get("x-consent-marketing")),
+        "gpc": headers.get("x-gpc") == "1" or headers.get("sec-gpc") == "1",
+        "dnt": headers.get("dnt") == "1",
+    }
+    # Fallback to cookies if present
+    try:
+        cookie_header = headers.get("cookie", "")
+        pairs = [c.strip().split("=", 1) for c in cookie_header.split(";") if "=" in c]
+        cookies = {k: v for k, v in pairs if k}
+        if "do_not_sell" in cookies:
+            consent["do_not_sell"] = cookies.get("do_not_sell") == "1" or consent["do_not_sell"]
+        usp = cookies.get("usprivacy")
+        if usp and len(usp) >= 3:
+            # crude interpretation: character 3 indicates sale opt-out in some variants
+            if "y" in usp.lower():
+                consent["do_not_sell"] = True
+    except Exception:
+        pass
+
+    # Enforce opt-out on GPC/DNT
+    if consent["gpc"] or consent["dnt"]:
+        consent["do_not_sell"] = True
+        consent["analytics"] = False
+        consent["marketing"] = False
+
+    request.state.consent = consent
+    response = await call_next(request)
+    try:
+        response.headers["X-Consent-Ack"] = ";".join([f"{k}={int(bool(v))}" for k, v in consent.items()])
+    except Exception:
+        pass
+    return response
 
 # Debug middleware to log requests
 @app.middleware("http")
@@ -43,6 +94,12 @@ app.include_router(hire.router)
 async def root():
     """Health check endpoint"""
     return {"message": "SG AI Backend is running", "status": "healthy"}
+
+@app.post("/contact", response_model=MessageResponse)
+async def contact_submit(payload: ContactRequest = Body(...)):
+    request_id = str(uuid.uuid4())
+    DatabaseService.create_contact_request(request_id, payload.dict())
+    return MessageResponse(message="Thanks! We'll get back to you shortly.")
 
 @app.options("/analyze/quick")
 async def analyze_quick_options():

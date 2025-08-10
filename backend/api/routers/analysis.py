@@ -30,7 +30,8 @@ LLM_MODEL_NAME = os.environ.get("OPENAI_MODEL", "gpt-5-nano")
 from ..models import (
     QuickAnalyzeRequest, ReportRequest, AnalysisResponse,
     ReportStatus, ReportResponse, StepsResponse, StepResponse,
-    StepUpdate, MessageResponse, EmailVerification
+    StepUpdate, MessageResponse, EmailVerification,
+    QuickAnalyzeResponse, CategoryScore
 )
 from ..utils import generate_verification_code, send_verification_email
 from ..database import DatabaseService
@@ -211,8 +212,8 @@ def summarize_reports(summaries: list[str], url: str) -> str:
         f"You have analyzed several pages from the website {url}. "
         "Below are the summaries for each page. "
         "Create a single, cohesive summary of the entire site's AEO performance. "
-        "Identify common themes, strengths, and weaknesses. "
-        "Conclude with the top 3-5 most impactful, site-wide recommendations.\n\n"
+        "Identify common themes, strengths, and weaknesses.\n\n"
+        #"Conclude with the top 3-5 most impactful, site-wide recommendations.\n\n"
         "Page Summaries:\n" + "\n\n".join(summaries)
     )
     
@@ -231,7 +232,7 @@ def build_aeo_prompt(content: dict) -> str:
     return (
         "You are an AEO (Answer Engine Optimization) auditor. "
         "Given the following webpage content, return a strict JSON object with this shape: "
-        "{\n  \"scores\": {\n    \"content_quality\": { \"score\": 1-5, \"reason\": string },\n    \"structure_optimization\": { \"score\": 1-5, \"reason\": string },\n    \"authority_trust\": { \"score\": 1-5, \"reason\": string }\n  },\n  \"recommendations\": [string, ...]\n}\n"
+        "{\n  \"scores\": {\n    \"content_quality\": { \"score\": 1-5, \"reason\": string },\n    \"structure_optimization\": { \"score\": 1-5, \"reason\": string },\n    \"authority_trust\": { \"score\": 1-5, \"reason\": string }\n  }\n}\n"
         "Rules: "
         "- Use integers 1-5 only for scores."
         "- Keep reasons under 140 characters each."
@@ -396,72 +397,9 @@ def create_summary_from_analysis(url: str, llm_json: Dict[str, Any] | None, stru
                 f"Authority: {reason_for('authority_trust')}"
             )
 
-        recs = (llm_json or {}).get("recommendations") or []
-        if isinstance(recs, list) and recs:
-            summary_parts.append("Top recommendations: " + "; ".join(recs[:5]))
-
         return " ".join(summary_parts)
     except Exception:
         return f"AEO analysis completed for {url}."
-
-
-def format_summary_as_html(page_results: List[dict], average_score: int) -> str:
-    """Return a compact HTML string rendering of results suitable for frontend display.
-
-    Includes a small table of per-page scores and a bullet list of quick recommendations if available.
-    """
-    try:
-        # Build per-page table rows (limit for brevity)
-        rows = []
-        for r in page_results[:6]:
-            url = r.get("url", "").replace("https://", "").replace("http://", "")
-            score = r.get("score", "-")
-            rows.append(f"<tr><td>{url}</td><td style='text-align:center'>{score}</td></tr>")
-
-        table_html = (
-            "<table style='width:100%; border-collapse:collapse'>"
-            "<thead><tr>"
-            "<th style='text-align:left; border-bottom:1px solid rgba(255,255,255,0.2); padding:6px 0'>Page</th>"
-            "<th style='text-align:center; border-bottom:1px solid rgba(255,255,255,0.2); padding:6px 0'>Score</th>"
-            "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
-        )
-
-        # Collect top recs from page summaries (simple heuristic: split sentences)
-        rec_items: List[str] = []
-        for r in page_results:
-            summary = r.get("summary") or ""
-            # pick short sentences that look like recommendations
-            for sent in summary.split(";"):
-                s = sent.strip()
-                if not s:
-                    continue
-                # crude filter to avoid repeating boilerplate
-                if any(kw in s.lower() for kw in ["recommend", "add ", "use ", "improve", "ensure", "consider"]):
-                    rec_items.append(s)
-        # De-duplicate and limit
-        seen = set()
-        deduped = []
-        for x in rec_items:
-            key = x.lower()
-            if key not in seen:
-                seen.add(key)
-                deduped.append(x)
-        rec_list = "".join(f"<li>{item}</li>" for item in deduped[:6])
-
-        rec_html = f"<ul style='margin:8px 0 0 16px'>{rec_list}</ul>" if rec_list else ""
-
-        extra_section = ""
-        if rec_list:
-            extra_section = "<h4 style='margin:16px 0 8px'>Quick Recommendations</h4>" + rec_html
-        return (
-            "<div>"
-            f"<p><strong>Overall Score:</strong> {average_score}/100</p>"
-            f"{table_html}"
-            f"{extra_section}"
-            "</div>"
-        )
-    except Exception:
-        return ""
 
 
 async def perform_full_site_analysis(analysis_id: str, start_url: str):
@@ -504,7 +442,7 @@ async def perform_full_site_analysis(analysis_id: str, start_url: str):
         DatabaseService.update_analysis(analysis_id, {"status": "failed", "summary": str(e)})
 
 
-@router.post("/analyze/quick", response_model=AnalysisResponse)
+@router.post("/analyze/quick", response_model=QuickAnalyzeResponse)
 async def quick_analyze(req: QuickAnalyzeRequest):
     """Perform quick, site-level AEO analysis with limited sub-page scanning.
 
@@ -536,31 +474,53 @@ async def quick_analyze(req: QuickAnalyzeRequest):
             structural_scores = score_aeo_features(content)
             score = calculate_score_from_signals(llm_json, structural_scores.get("total_score", 0))
             summary = create_summary_from_analysis(page_url, llm_json, structural_scores)
-            page_results.append({"url": page_url, "score": score, "summary": summary})
+            page_results.append({"url": page_url, "score": score, "summary": summary, "llm": llm_json})
 
         if not page_results:
             raise HTTPException(status_code=400, detail="Unable to access or parse the URL content")
 
         # Aggregate
         average_score = round(sum(r["score"] for r in page_results) / len(page_results))
-        # Keep the homepage summary as primary, append brief notes from others
-        homepage_summary = next((r["summary"] for r in page_results if r["url"] == urls[0]), page_results[0]["summary"])
-        other_notes = "; ".join(r["summary"] for r in page_results[1:3])  # keep short
-        final_summary = homepage_summary if not other_notes else f"{homepage_summary} Additional findings: {other_notes}"
-        formatted_summary_html = format_summary_as_html(page_results, average_score)
 
-        DatabaseService.create_analysis(analysis_id, req.url, final_summary, average_score)
+        # Select homepage LLM scores (fallback to first)
+        primary = next((r for r in page_results if r["url"] == urls[0]), page_results[0])
+        llm_scores = (primary.get("llm") or {}).get("scores") or {}
 
-        return AnalysisResponse(score=average_score, summary=final_summary, analysis_id=analysis_id, formatted_summary_html=formatted_summary_html)
+        # Build structured response
+        def to_category(key: str) -> CategoryScore:
+            data = llm_scores.get(key) or {}
+            raw_score = data.get("score")
+            s: int = int(raw_score) if isinstance(raw_score, int) else 3
+            reason: str = data.get("reason") or ""
+            s = max(1, min(5, s))
+            return CategoryScore(score=s, reason=reason)
+
+        DatabaseService.create_analysis(analysis_id, req.url, "", average_score)
+
+        return QuickAnalyzeResponse(
+            analysis_id=analysis_id,
+            overall_score=average_score,
+            url=req.url,
+            content_quality=to_category("content_quality"),
+            structure_optimization=to_category("structure_optimization"),
+            authority_trust=to_category("authority_trust"),
+        )
 
     except HTTPException as he:
         raise he
     except Exception as e:
         print(f"Error in quick_analyze: {e}")
-        summary = f"AEO analysis failed for {req.url}. Please verify the URL is accessible."
+        default_reason = "Analysis error. Using default values."
         score = 60
-        DatabaseService.create_analysis(analysis_id, req.url, summary, score)
-        return AnalysisResponse(score=score, summary=summary, analysis_id=analysis_id)
+        DatabaseService.create_analysis(analysis_id, req.url, default_reason, score)
+        return QuickAnalyzeResponse(
+            analysis_id=analysis_id,
+            overall_score=score,
+            url=req.url,
+            content_quality=CategoryScore(score=3, reason=default_reason),
+            structure_optimization=CategoryScore(score=3, reason=default_reason),
+            authority_trust=CategoryScore(score=3, reason=default_reason),
+        )
 
 
 # Removed deep analyze endpoint not used by the frontend

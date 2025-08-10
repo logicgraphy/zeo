@@ -73,3 +73,23 @@ class AnalysisResponse(BaseModel):
     summary: str
     analysis_id: str
     formatted_summary_html: Optional[str] = None
+
+# Contact models
+class ContactRequest(BaseModel):
+    name: str
+    email: EmailStr
+    subject: Optional[str] = None
+    message: str
+
+# Quick analyze structured models
+class CategoryScore(BaseModel):
+    score: int
+    reason: str
+
+class QuickAnalyzeResponse(BaseModel):
+    analysis_id: str
+    overall_score: int
+    url: str
+    content_quality: CategoryScore
+    structure_optimization: CategoryScore
+    authority_trust: CategoryScore

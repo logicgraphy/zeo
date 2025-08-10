@@ -8,6 +8,7 @@ analysis_db: Dict[str, dict] = {}
 reports_db: Dict[str, dict] = {}
 steps_db: Dict[str, List[dict]] = {}  # Fixed type: analysis_id -> list of steps
 hire_requests_db: Dict[str, dict] = {}
+contact_requests_db: Dict[str, dict] = {}
 
 class DatabaseService:
     """Service class for database operations"""
@@ -101,3 +102,11 @@ class DatabaseService:
     def create_hire_request(request_id: str, hire_data: dict) -> dict:
         hire_requests_db[request_id] = hire_data
         return hire_data 
+
+    @staticmethod
+    def create_contact_request(request_id: str, contact_data: dict) -> dict:
+        contact_requests_db[request_id] = {
+            **contact_data,
+            "received_at": datetime.now(),
+        }
+        return contact_requests_db[request_id]
