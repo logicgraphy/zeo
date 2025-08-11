@@ -109,8 +109,10 @@ export default function PrivacyCenter() {
           </label>
         </div>
         <div className="modal-footer">
-          <button className="cancel-button" onClick={closePrivacyCenter}>Cancel</button>
-          <button className="submit-button" onClick={handleSave}>Save preferences</button>
+          <div className='button-group'>
+            <button className="cancel-button" onClick={closePrivacyCenter}>Close</button>
+            <button className="submit-button" onClick={handleSave}>Save preferences</button>            
+          </div>
         </div>
       </div>
     </div>

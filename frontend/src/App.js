@@ -147,10 +147,10 @@ const ContactModal = ({ isOpen, onClose }) => {
             {success && <div className="success-message">{success}</div>}
 
             <div className="button-group">
+            <button type="button" className="cancel-button" onClick={onClose}>Cancel</button>
               <button type="submit" className="submit-button" disabled={loading || !form.name || !form.email || !form.message || !captchaChecked}>
                 {loading ? 'Sending...' : 'Send Message'}
-              </button>
-              <button type="button" className="cancel-button" onClick={onClose}>Cancel</button>
+              </button>              
             </div>
           </form>
         </div>
@@ -229,7 +229,7 @@ const UrlInputForm = ({ onAnalyze, loading, error }) => {
 
   return (
     <div className="form-container">
-      <h2>Optimize your business for AI</h2>
+      <h2>Optimize your website for AI</h2>
       <p className="subtitle">Enter your website URL to get a quick analysis</p>
       
       <form onSubmit={handleSubmit} className="url-form">
@@ -349,6 +349,15 @@ const QuickGradeResult = ({ score, url, categories, onRequestReport, loading, er
           </div>
           <p className="category-reason">{cat?.authority_trust?.reason || '—'}</p>
         </div>
+        <div className="category-card">
+          <div className="category-header">
+            <span>AI Agent Compatibility</span>
+            <span className="category-score" style={{ color: getCatColor(cat?.ai_agent_compatibility?.score) }}>
+              {cat?.ai_agent_compatibility?.score ?? '-'}&#8239;/&#8239;5
+            </span>
+          </div>
+          <p className="category-reason">{cat?.ai_agent_compatibility?.reason || '—'}</p>
+        </div>
       </div>
 
       {!showEmailForm ? (
@@ -377,21 +386,20 @@ const QuickGradeResult = ({ score, url, categories, onRequestReport, loading, er
           </div>
           
           {error && <div className="error-message">{error}</div>}
-          <div className="button-group">
-            <button 
-              type="submit" 
-              className="submit-button" 
-              disabled={loading || !email.trim()}
-            >
-              {loading ? 'Sending...' : 'Send Report'}
-            </button>
-            
+          <div className="button-group">                      
             <button 
               type="button" 
               className="cancel-button"
               onClick={() => setShowEmailForm(false)}
             >
               Cancel
+            </button>
+            <button 
+              type="submit" 
+              className="submit-button" 
+              disabled={loading || !email.trim()}
+            >
+              {loading ? 'Sending...' : 'Send Report'}
             </button>
           </div>          
         </form>
@@ -434,16 +442,8 @@ const EmailVerificationForm = ({ email, onVerify, onResend, loading, error, succ
         </div>
         
         {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
+        {!loading && success && <div className="success-message">{success}</div>}
         <div className="button-group">
-          <button 
-            type="submit" 
-            className="submit-button" 
-            disabled={loading || code.length !== 6}
-          >
-            {loading ? 'Verifying...' : 'Verify Email'}
-          </button>
-          
           <button 
             type="button" 
             className="resend-button" 
@@ -452,26 +452,175 @@ const EmailVerificationForm = ({ email, onVerify, onResend, loading, error, succ
           >
             Resend Code
           </button> 
+          <button 
+            type="submit" 
+            className="submit-button" 
+            disabled={loading || code.length !== 6}
+          >
+            {loading ? 'Verifying...' : 'Verify Email'}
+          </button>
         </div>        
       </form>
-      
-      <p className="help-text">
-        Check your console for the verification code (demo mode)
-      </p>
+
+      {loading && success && (
+        <div className="loading-spinner" style={{ marginTop: '16px' }}>
+          <div className="spinner"></div>
+          <p>Generating your report…</p>
+        </div>
+      )}
+
+      <p className="help-text">Check your console for the verification code (demo mode)</p>
     </div>
   );
 };
 
-// Detailed Report Component (Step 5 & 6)
+// AEO Report View (formatted rendering for detailed report)
+function AEOReportView({ data }) {
+  // Typography scale & shared styles (match homepage form-container scheme)
+  const COLORS = {
+    border: 'rgba(255, 255, 255, 0.2)',
+    text: 'rgba(255, 255, 255, 0.95)',
+    subtext: 'rgba(255, 255, 255, 0.8)',
+    badge: 'rgba(255, 255, 255, 0.35)',
+    cardBorder: 'rgba(255, 255, 255, 0.25)'
+  };
+
+  const S = {
+    container: {
+      maxWidth: 960,
+      margin: '0 auto',
+      padding: '0 16px 32px',
+      fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+      color: COLORS.text,
+      lineHeight: 1.6,
+      fontSize: 16,
+    },
+    header: { margin: '28px 0 16px' },
+    h1: { margin: 0, fontSize: 'clamp(24px, 3.5vw, 34px)', lineHeight: 1.2 },
+    metaRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
+    badge: {
+      padding: '4px 10px',
+      borderRadius: 999,
+      border: `1px solid ${COLORS.badge}`,
+      fontSize: 13,
+      background: 'transparent',
+      color: COLORS.text
+    },
+    section: {
+      margin: '20px 0',
+      padding: 18,
+      border: `1px solid ${COLORS.border}`,
+      borderRadius: 12,
+      background: 'transparent',
+      backdropFilter: 'blur(0px)'
+    },
+    h2: { margin: '0 0 6px 0', fontSize: 'clamp(18px, 2.2vw, 22px)', lineHeight: 1.3 },
+    h3: { margin: '14px 0 6px', fontSize: 17, lineHeight: 1.35 },
+    h4: { margin: '12px 0 6px', fontSize: 16, lineHeight: 1.35 },
+    p: { margin: '6px 0', fontSize: 16, color: COLORS.text },
+    subP: { margin: '6px 0', fontSize: 15, color: COLORS.subtext },
+    ul: { margin: '8px 0 0 0', paddingLeft: 20, fontSize: 15.5 },
+    card: { padding: 12, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, marginBottom: 10, background: 'transparent' },
+    pillRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 },
+  };
+
+  const Badge = ({ children }) => (<span style={S.badge}>{children}</span>);
+
+  const Section = ({ title, children }) => (
+    <section style={S.section}>
+      <h2 style={S.h2}>{title}</h2>
+      {children}
+    </section>
+  );
+
+  const List = ({ items }) => (
+    <ul style={S.ul}>{(items || []).map((it, i) => <li key={i}>{it}</li>)}</ul>
+  );
+
+  return (
+    <div style={S.container}>
+      <header style={S.header}>
+        <h1 style={S.h1}>{data?.meta?.report_title}</h1>
+        <div style={S.metaRow}>
+          <Badge>Scope: {data?.meta?.scope || '-'}</Badge>
+          <Badge>Analyzed: {data?.meta?.analyzed_at ? new Date(data.meta.analyzed_at).toLocaleDateString() : '-'}</Badge>
+          <Badge>Score: {data?.meta?.overall_score ?? '-'} / 100</Badge>
+          <Badge>Analyst: {data?.meta?.analyst || '-'}</Badge>
+          <Badge>Tool: {data?.meta?.tool_version || '-'}</Badge>
+        </div>
+      </header>
+
+      <Section title="Executive Summary">
+        <p style={S.p}>{data?.executive_summary?.summary_paragraph}</p>
+        <List items={data?.executive_summary?.highlights || []} />
+      </Section>
+
+      <Section title="Overall Findings">
+        <p style={S.subP}><strong>Content Quality:</strong> {data?.overall_findings?.content_quality?.score}/5 — {data?.overall_findings?.content_quality?.notes}</p>
+        <p style={S.subP}><strong>Structure:</strong> {data?.overall_findings?.structure?.score}/5 — {data?.overall_findings?.structure?.notes}</p>
+        <p style={S.subP}><strong>Authority Signals:</strong> {data?.overall_findings?.authority_signals?.score}/5 — {data?.overall_findings?.authority_signals?.notes}</p>
+        <p style={S.subP}><strong>AI Agent Compatibility:</strong> {data?.overall_findings?.ai_agent_compatibility?.score}/5 — {data?.overall_findings?.ai_agent_compatibility?.notes}</p>
+        <p style={{ ...S.p, marginTop: 8 }}>{data?.overall_findings?.impact}</p>
+        <h3 style={S.h3}>Common Themes</h3>
+        <List items={data?.overall_findings?.common_themes || []} />
+      </Section>
+
+      <Section title="Strengths">
+        <h4 style={S.h4}>Brand & Domain Trust</h4>
+        <List items={data?.strengths?.brand_domain_trust || []} />
+        <h4 style={S.h4}>Navigation & Layout</h4>
+        <List items={data?.strengths?.navigation_layout || []} />
+        <h4 style={S.h4}>Technical Signals</h4>
+        <List items={data?.strengths?.technical_signals || []} />
+      </Section>
+
+      <Section title="Weaknesses">
+        <h4 style={S.h4}>Content Depth</h4>
+        <List items={data?.weaknesses?.content_depth || []} />
+        <h4 style={S.h4}>Authority & Trust</h4>
+        <List items={data?.weaknesses?.authority_trust || []} />
+        <h4 style={S.h4}>Semantic & Accessibility</h4>
+        <List items={data?.weaknesses?.semantic_accessibility || []} />
+        <h4 style={S.h4}>UX Friction</h4>
+        <List items={data?.weaknesses?.ux_friction || []} />
+      </Section>
+
+      <Section title="Recommendations (Prioritized)">
+        {(data?.recommendations || []).map((rec, i) => (
+          <div key={i} style={S.card}>
+            <div style={S.pillRow}>
+              <Badge>Priority: {rec?.priority}</Badge>
+              <Badge>Owner: {rec?.owner}</Badge>
+              <Badge>Effort: {rec?.effort}</Badge>
+              <Badge>Impact: {rec?.impact}</Badge>
+            </div>
+            <strong style={{ fontSize: 16 }}>{rec?.action}</strong>
+            <p style={{ ...S.p, margin: '6px 0' }}>{rec?.rationale}</p>
+            <small style={{ display: 'block', marginBottom: 4 }}>Success metrics:</small>
+            <List items={rec?.success_metrics || []} />
+          </div>
+        ))}
+      </Section>
+
+      {/* Still omitting: Implications, Quick Wins, Page Scores, AB tests, KPIs in this view */}
+
+      <Section title="Bottom Line">
+        <p style={S.p}>{data?.bottom_line}</p>
+      </Section>
+    </div>
+  );
+}
+
+// Detailed Report Component
 const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
   if (loading) {
     return (
       <div className="form-container">
         <h2>Generating Your Report</h2>
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Analyzing your website in detail...</p>
+        <div className="wait-indicator" aria-live="polite" aria-busy="true">
+          <img src="/img/wait.png" alt="Loading" className="wait-icon wait-icon--large" />
         </div>
+        <p style={{ marginTop: '12px' }}>Analyzing your website in detail...</p>
       </div>
     );
   }
@@ -487,46 +636,16 @@ const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
 
   return (
     <div className="form-container report-container">
-      <h2>Detailed AI readiness Report</h2>
-      
-      <div className="report-summary">
-        <div className="score-display">
-          <h3>Overall Score: {reportData.score}/100</h3>
-        </div>
-        
-        {reportData.report_url && (
-          <div className="report-link">
-            <a href={reportData.report_url} target="_blank" rel="noopener noreferrer">
-              View Full Report
-            </a>
-          </div>
-        )}
-      </div>
-
-      <div className="issues-summary">
-        <h3>Key Issues Found</h3>
-        {reportData.issues && reportData.issues.length > 0 ? (
-          <ul className="issues-list">
-            {reportData.issues.slice(0, 5).map((issue, index) => (
-              <li key={index} className={`issue issue-${issue.priority}`}>
-                <span className="issue-text">{issue.text}</span>
-                <span className="issue-priority">{issue.priority}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>Great! No major issues found.</p>
-        )}
-      </div>
+      <AEOReportView data={reportData} />
 
       <div className="action-buttons">
         <h3>How would you like to proceed?</h3>
         <div className="button-group">
           <button className="diy-button" onClick={onChooseDIY}>
-            <span className="button-icon">🔧</span>
+            <span className="button-icon">🔍</span>
             <span className="button-text">
-              <strong>Fix it Myself</strong>
-              <small>Get step-by-step guidance</small>
+              <strong>View Details</strong>
+              <small>See page scores and summary</small>
             </span>
           </button>
           
@@ -543,76 +662,7 @@ const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
   );
 };
 
-// DIY Steps Component (Step 7)
-const DIYSteps = ({ steps, onUpdateStep, onBack, loading }) => {
-  const groupedSteps = {
-    high: steps.filter(step => step.priority === 'high'),
-    medium: steps.filter(step => step.priority === 'medium'),
-    low: steps.filter(step => step.priority === 'low')
-  };
-
-  const handleStepToggle = (stepId, completed) => {
-    onUpdateStep(stepId, completed);
-  };
-
-  const priorityLabels = {
-    high: { label: 'High Priority', color: '#F44336' },
-    medium: { label: 'Medium Priority', color: '#FF9800' },
-    low: { label: 'Low Priority', color: '#4CAF50' }
-  };
-
-  return (
-    <div className="form-container diy-container">
-      <h2>DIY AI readiness Improvement Guide</h2>
-      <p className="subtitle">Follow these steps to improve your website's AI readiness</p>
-      
-      {Object.entries(groupedSteps).map(([priority, prioritySteps]) => (
-        prioritySteps.length > 0 && (
-          <div key={priority} className="priority-section">
-            <h3 
-              className="priority-header"
-              style={{ color: priorityLabels[priority].color }}
-            >
-              {priorityLabels[priority].label} ({prioritySteps.length} items)
-            </h3>
-            
-            <div className="steps-list">
-              {prioritySteps.map(step => (
-                <div key={step.id} className="step-item">
-                  <label className="step-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={step.completed}
-                      onChange={(e) => handleStepToggle(step.id, e.target.checked)}
-                      disabled={loading}
-                    />
-                    <span className="checkmark"></span>
-                  </label>
-                  
-                  <div className={`step-content ${step.completed ? 'completed' : ''}`}>
-                    <p className="step-text">{step.step_text}</p>
-                    {step.impact && (
-                      <p className="step-impact">Expected Impact: {step.impact}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      ))}
-      
-      <div className="action-buttons">
-        <button className="download-button">
-          📄 Download as PDF
-        </button>
-        <button className="back-button" onClick={onBack}>
-          ← Back to Report
-        </button>
-      </div>
-    </div>
-  );
-};
+// Steps workflow removed
 
 // Hire Form Component (Step 8)
 const HireForm = ({ url, email, onSubmit, onBack, loading, error, success }) => {
@@ -755,7 +805,6 @@ function App() {
   const [quickCategories, setQuickCategories] = useState(null);
   const [email, setEmail] = useState('');
   const [reportData, setReportData] = useState(null);
-  const [steps, setSteps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -769,7 +818,6 @@ function App() {
     setAnalyzedUrl('');
     setEmail('');
     setReportData(null);
-    setSteps([]);
     setLoading(false);
     setError('');
     setSuccess('');
@@ -824,6 +872,7 @@ function App() {
         content_quality: result.content_quality,
         structure_optimization: result.structure_optimization,
         authority_trust: result.authority_trust,
+        ai_agent_compatibility: result.ai_agent_compatibility,
       });
       // no summary in new quick response
       setAnalysisId(result.analysis_id);
@@ -857,19 +906,13 @@ function App() {
     setLoading(true);
     setError('');
     setSuccess('');
-    
     try {
       await apiCall('/auth/verify-email', 'POST', { email, code });
       setSuccess('Email verified! Generating your report...');
       
-      // Fetch the detailed report
+      // Fetch the detailed report (now includes page_results and summary)
       const report = await apiCall(`/report/${analysisId}`);
       setReportData(report);
-      
-      // Fetch DIY steps
-      const stepsResult = await apiCall(`/report/${analysisId}/steps`);
-      setSteps(stepsResult.steps || []);
-      
       setCurrentStep('detailedReport');
     } catch (err) {
       setError(err.message);
@@ -894,17 +937,7 @@ function App() {
     }
   };
 
-  // Step 7: Handle step completion update
-  const handleUpdateStep = async (stepId, completed) => {
-    try {
-      const updatedStep = await apiCall(`/steps/${stepId}`, 'PATCH', { completed });
-      setSteps(steps.map(step => 
-        step.id === stepId ? { ...step, completed: updatedStep.completed } : step
-      ));
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  // Steps removed
 
   // Step 8: Handle hire form submission
   const handleHireSubmit = async (hireData) => {
@@ -926,7 +959,7 @@ function App() {
 
   // Navigation helpers
   const goToReport = () => setCurrentStep('detailedReport');
-  const goToDIY = () => setCurrentStep('diySteps');
+  const goToDIY = () => setCurrentStep('detailedReport');
   const goToHire = () => setCurrentStep('hireForm');
 
   // Render current step
@@ -971,15 +1004,7 @@ function App() {
             loading={loading}
           />
         );
-      case 'diySteps':
-        return (
-          <DIYSteps 
-            steps={steps}
-            onUpdateStep={handleUpdateStep}
-            onBack={goToReport}
-            loading={loading}
-          />
-        );
+      // steps workflow removed
       case 'hireForm':
         return (
           <HireForm 

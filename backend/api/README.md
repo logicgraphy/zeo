@@ -51,9 +51,7 @@ api/
 - `POST /report/request` - Request detailed report
 - `POST /auth/verify-email` - Verify email for report access
 - `GET /report/status/{analysis_id}` - Get report status
-- `GET /report/{analysis_id}` - Get detailed report
-- `GET /report/{analysis_id}/steps` - Get improvement steps
-- `PATCH /steps/{step_id}` - Update step completion
+- `GET /report/{analysis_id}` - Generate and return a detailed report (runs full-site analysis)
 
 ### Hire (`/hire`)
 - `POST /hire/request` - Submit hire request

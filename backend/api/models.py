@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 
 # User-related models
@@ -30,29 +30,60 @@ class ReportStatus(BaseModel):
     score: int
     report_url: Optional[str] = None
 
-class ReportResponse(BaseModel):
-    report_id: str
+class AEOReportMeta(BaseModel):
+    report_title: str
+    scope: str
+    analyzed_at: str
+    overall_score: int
+    analyst: str
+    tool_version: str
+
+class ExecutiveSummary(BaseModel):
+    summary_paragraph: str
+    highlights: List[str]
+
+class ScoreNotes(BaseModel):
     score: int
-    issues: list[dict]
-    report_url: Optional[str] = None
+    notes: str
 
-# Step models
-class StepPriority(str, Enum):
-    high = "high"
-    medium = "medium"
-    low = "low"
+class OverallFindings(BaseModel):
+    content_quality: ScoreNotes
+    structure: ScoreNotes
+    authority_signals: ScoreNotes
+    ai_agent_compatibility: ScoreNotes
+    impact: str
+    common_themes: List[str]
 
-class StepResponse(BaseModel):
-    id: str
-    priority: StepPriority
-    text: str
-    completed: bool
+class Strengths(BaseModel):
+    brand_domain_trust: List[str]
+    navigation_layout: List[str]
+    technical_signals: List[str]
 
-class StepUpdate(BaseModel):
-    completed: bool
+class Weaknesses(BaseModel):
+    content_depth: List[str]
+    authority_trust: List[str]
+    semantic_accessibility: List[str]
+    ux_friction: List[str]
 
-class StepsResponse(BaseModel):
-    steps: list[StepResponse]
+class Recommendation(BaseModel):
+    priority: str
+    action: str
+    rationale: str
+    owner: str
+    effort: str
+    impact: str
+    success_metrics: List[str]
+
+class AEOReport(BaseModel):
+    meta: AEOReportMeta
+    executive_summary: ExecutiveSummary
+    overall_findings: OverallFindings
+    strengths: Strengths
+    weaknesses: Weaknesses
+    recommendations: List[Recommendation]
+    bottom_line: str
+
+# Steps: removed from workflow
 
 # Hire request models
 class HireRequest(BaseModel):
@@ -93,3 +124,4 @@ class QuickAnalyzeResponse(BaseModel):
     content_quality: CategoryScore
     structure_optimization: CategoryScore
     authority_trust: CategoryScore
+    ai_agent_compatibility: CategoryScore
