@@ -147,10 +147,10 @@ const ContactModal = ({ isOpen, onClose }) => {
             {success && <div className="success-message">{success}</div>}
 
             <div className="button-group">
+            <button type="button" className="cancel-button" onClick={onClose}>Cancel</button>
               <button type="submit" className="submit-button" disabled={loading || !form.name || !form.email || !form.message || !captchaChecked}>
                 {loading ? 'Sending...' : 'Send Message'}
-              </button>
-              <button type="button" className="cancel-button" onClick={onClose}>Cancel</button>
+              </button>              
             </div>
           </form>
         </div>
@@ -349,6 +349,15 @@ const QuickGradeResult = ({ score, url, categories, onRequestReport, loading, er
           </div>
           <p className="category-reason">{cat?.authority_trust?.reason || '—'}</p>
         </div>
+        <div className="category-card">
+          <div className="category-header">
+            <span>AI Agent Compatibility</span>
+            <span className="category-score" style={{ color: getCatColor(cat?.ai_agent_compatibility?.score) }}>
+              {cat?.ai_agent_compatibility?.score ?? '-'}&#8239;/&#8239;5
+            </span>
+          </div>
+          <p className="category-reason">{cat?.ai_agent_compatibility?.reason || '—'}</p>
+        </div>
       </div>
 
       {!showEmailForm ? (
@@ -377,21 +386,20 @@ const QuickGradeResult = ({ score, url, categories, onRequestReport, loading, er
           </div>
           
           {error && <div className="error-message">{error}</div>}
-          <div className="button-group">
-            <button 
-              type="submit" 
-              className="submit-button" 
-              disabled={loading || !email.trim()}
-            >
-              {loading ? 'Sending...' : 'Send Report'}
-            </button>
-            
+          <div className="button-group">                      
             <button 
               type="button" 
               className="cancel-button"
               onClick={() => setShowEmailForm(false)}
             >
               Cancel
+            </button>
+            <button 
+              type="submit" 
+              className="submit-button" 
+              disabled={loading || !email.trim()}
+            >
+              {loading ? 'Sending...' : 'Send Report'}
             </button>
           </div>          
         </form>
@@ -434,16 +442,8 @@ const EmailVerificationForm = ({ email, onVerify, onResend, loading, error, succ
         </div>
         
         {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
+        {!loading && success && <div className="success-message">{success}</div>}
         <div className="button-group">
-          <button 
-            type="submit" 
-            className="submit-button" 
-            disabled={loading || code.length !== 6}
-          >
-            {loading ? 'Verifying...' : 'Verify Email'}
-          </button>
-          
           <button 
             type="button" 
             className="resend-button" 
@@ -452,13 +452,20 @@ const EmailVerificationForm = ({ email, onVerify, onResend, loading, error, succ
           >
             Resend Code
           </button> 
+          <button 
+            type="submit" 
+            className="submit-button" 
+            disabled={loading || code.length !== 6}
+          >
+            {loading ? 'Verifying...' : 'Verify Email'}
+          </button>
         </div>        
       </form>
-      
+
       {loading && success && (
         <div className="loading-spinner" style={{ marginTop: '16px' }}>
           <div className="spinner"></div>
-          <p>{success}</p>
+          <p>Generating your report…</p>
         </div>
       )}
 
@@ -466,6 +473,143 @@ const EmailVerificationForm = ({ email, onVerify, onResend, loading, error, succ
     </div>
   );
 };
+
+// AEO Report View (formatted rendering for detailed report)
+function AEOReportView({ data }) {
+  // Typography scale & shared styles (match homepage form-container scheme)
+  const COLORS = {
+    border: 'rgba(255, 255, 255, 0.2)',
+    text: 'rgba(255, 255, 255, 0.95)',
+    subtext: 'rgba(255, 255, 255, 0.8)',
+    badge: 'rgba(255, 255, 255, 0.35)',
+    cardBorder: 'rgba(255, 255, 255, 0.25)'
+  };
+
+  const S = {
+    container: {
+      maxWidth: 960,
+      margin: '0 auto',
+      padding: '0 16px 32px',
+      fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+      color: COLORS.text,
+      lineHeight: 1.6,
+      fontSize: 16,
+    },
+    header: { margin: '28px 0 16px' },
+    h1: { margin: 0, fontSize: 'clamp(24px, 3.5vw, 34px)', lineHeight: 1.2 },
+    metaRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
+    badge: {
+      padding: '4px 10px',
+      borderRadius: 999,
+      border: `1px solid ${COLORS.badge}`,
+      fontSize: 13,
+      background: 'transparent',
+      color: COLORS.text
+    },
+    section: {
+      margin: '20px 0',
+      padding: 18,
+      border: `1px solid ${COLORS.border}`,
+      borderRadius: 12,
+      background: 'transparent',
+      backdropFilter: 'blur(0px)'
+    },
+    h2: { margin: '0 0 6px 0', fontSize: 'clamp(18px, 2.2vw, 22px)', lineHeight: 1.3 },
+    h3: { margin: '14px 0 6px', fontSize: 17, lineHeight: 1.35 },
+    h4: { margin: '12px 0 6px', fontSize: 16, lineHeight: 1.35 },
+    p: { margin: '6px 0', fontSize: 16, color: COLORS.text },
+    subP: { margin: '6px 0', fontSize: 15, color: COLORS.subtext },
+    ul: { margin: '8px 0 0 0', paddingLeft: 20, fontSize: 15.5 },
+    card: { padding: 12, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, marginBottom: 10, background: 'transparent' },
+    pillRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 },
+  };
+
+  const Badge = ({ children }) => (<span style={S.badge}>{children}</span>);
+
+  const Section = ({ title, children }) => (
+    <section style={S.section}>
+      <h2 style={S.h2}>{title}</h2>
+      {children}
+    </section>
+  );
+
+  const List = ({ items }) => (
+    <ul style={S.ul}>{(items || []).map((it, i) => <li key={i}>{it}</li>)}</ul>
+  );
+
+  return (
+    <div style={S.container}>
+      <header style={S.header}>
+        <h1 style={S.h1}>{data?.meta?.report_title}</h1>
+        <div style={S.metaRow}>
+          <Badge>Scope: {data?.meta?.scope || '-'}</Badge>
+          <Badge>Analyzed: {data?.meta?.analyzed_at ? new Date(data.meta.analyzed_at).toLocaleDateString() : '-'}</Badge>
+          <Badge>Score: {data?.meta?.overall_score ?? '-'} / 100</Badge>
+          <Badge>Analyst: {data?.meta?.analyst || '-'}</Badge>
+          <Badge>Tool: {data?.meta?.tool_version || '-'}</Badge>
+        </div>
+      </header>
+
+      <Section title="Executive Summary">
+        <p style={S.p}>{data?.executive_summary?.summary_paragraph}</p>
+        <List items={data?.executive_summary?.highlights || []} />
+      </Section>
+
+      <Section title="Overall Findings">
+        <p style={S.subP}><strong>Content Quality:</strong> {data?.overall_findings?.content_quality?.score}/5 — {data?.overall_findings?.content_quality?.notes}</p>
+        <p style={S.subP}><strong>Structure:</strong> {data?.overall_findings?.structure?.score}/5 — {data?.overall_findings?.structure?.notes}</p>
+        <p style={S.subP}><strong>Authority Signals:</strong> {data?.overall_findings?.authority_signals?.score}/5 — {data?.overall_findings?.authority_signals?.notes}</p>
+        <p style={S.subP}><strong>AI Agent Compatibility:</strong> {data?.overall_findings?.ai_agent_compatibility?.score}/5 — {data?.overall_findings?.ai_agent_compatibility?.notes}</p>
+        <p style={{ ...S.p, marginTop: 8 }}>{data?.overall_findings?.impact}</p>
+        <h3 style={S.h3}>Common Themes</h3>
+        <List items={data?.overall_findings?.common_themes || []} />
+      </Section>
+
+      <Section title="Strengths">
+        <h4 style={S.h4}>Brand & Domain Trust</h4>
+        <List items={data?.strengths?.brand_domain_trust || []} />
+        <h4 style={S.h4}>Navigation & Layout</h4>
+        <List items={data?.strengths?.navigation_layout || []} />
+        <h4 style={S.h4}>Technical Signals</h4>
+        <List items={data?.strengths?.technical_signals || []} />
+      </Section>
+
+      <Section title="Weaknesses">
+        <h4 style={S.h4}>Content Depth</h4>
+        <List items={data?.weaknesses?.content_depth || []} />
+        <h4 style={S.h4}>Authority & Trust</h4>
+        <List items={data?.weaknesses?.authority_trust || []} />
+        <h4 style={S.h4}>Semantic & Accessibility</h4>
+        <List items={data?.weaknesses?.semantic_accessibility || []} />
+        <h4 style={S.h4}>UX Friction</h4>
+        <List items={data?.weaknesses?.ux_friction || []} />
+      </Section>
+
+      <Section title="Recommendations (Prioritized)">
+        {(data?.recommendations || []).map((rec, i) => (
+          <div key={i} style={S.card}>
+            <div style={S.pillRow}>
+              <Badge>Priority: {rec?.priority}</Badge>
+              <Badge>Owner: {rec?.owner}</Badge>
+              <Badge>Effort: {rec?.effort}</Badge>
+              <Badge>Impact: {rec?.impact}</Badge>
+            </div>
+            <strong style={{ fontSize: 16 }}>{rec?.action}</strong>
+            <p style={{ ...S.p, margin: '6px 0' }}>{rec?.rationale}</p>
+            <small style={{ display: 'block', marginBottom: 4 }}>Success metrics:</small>
+            <List items={rec?.success_metrics || []} />
+          </div>
+        ))}
+      </Section>
+
+      {/* Still omitting: Implications, Quick Wins, Page Scores, AB tests, KPIs in this view */}
+
+      <Section title="Bottom Line">
+        <p style={S.p}>{data?.bottom_line}</p>
+      </Section>
+    </div>
+  );
+}
 
 // Detailed Report Component
 const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
@@ -490,196 +634,9 @@ const DetailedReport = ({ reportData, onChooseDIY, onChooseHire, loading }) => {
     );
   }
 
-  const meta = reportData.meta || {};
-  const exec = reportData.executive_summary || {};
-  const overall = reportData.overall_findings || {};
-  const strengths = reportData.strengths || {};
-  const weaknesses = reportData.weaknesses || {};
-  const implications = reportData.implications_for_aeo || {};
-  const recommendations = reportData.recommendations || [];
-  const checklist = reportData.quick_win_checklist || [];
-  const pageScores = reportData.page_scores || [];
-  const abTests = reportData.ab_testing_plan || [];
-  const kpis = reportData.kpis_to_monitor || [];
-
   return (
     <div className="form-container report-container">
-      <h2>{meta.report_title || 'AEO Site Report'}</h2>
-      
-      <div className="report-summary">
-        <div className="score-display">
-          <h3>Overall Score: {meta.overall_score ?? '-'} / 100</h3>
-        </div>
-        <p><strong>Scope:</strong> {meta.scope || '—'}</p>
-        <p><strong>Analyzed At:</strong> {meta.analyzed_at || '—'}</p>
-      </div>
-
-      <section className="issues-summary">
-        <h3>Executive Summary</h3>
-        <p>{exec.summary_paragraph}</p>
-        {Array.isArray(exec.highlights) && exec.highlights.length > 0 && (
-          <ul className="issues-list">
-            {exec.highlights.map((h, i) => (
-              <li key={i} className="issue"><span className="issue-text">{h}</span></li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="issues-summary">
-        <h3>Overall Findings</h3>
-        <ul className="issues-list">
-          <li className="issue"><span className="issue-text">Content Quality: {overall.content_quality?.score ?? '-'} / 5 — {overall.content_quality?.notes || ''}</span></li>
-          <li className="issue"><span className="issue-text">Structure: {overall.structure?.score ?? '-'} / 5 — {overall.structure?.notes || ''}</span></li>
-          <li className="issue"><span className="issue-text">Authority Signals: {overall.authority_signals?.score ?? '-'} / 5 — {overall.authority_signals?.notes || ''}</span></li>
-        </ul>
-        {overall.impact && <p><strong>Impact:</strong> {overall.impact}</p>}
-        {Array.isArray(overall.common_themes) && overall.common_themes.length > 0 && (
-          <>
-            <h4>Common Themes</h4>
-            <ul className="issues-list">
-              {overall.common_themes.map((t, i) => (
-                <li key={i} className="issue"><span className="issue-text">{t}</span></li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
-
-      <section className="issues-summary">
-        <h3>Strengths</h3>
-        <div className="two-col">
-          <div>
-            <h4>Brand & Domain Trust</h4>
-            <ul className="issues-list">{(strengths.brand_domain_trust || []).map((s, i) => <li key={i} className="issue"><span className="issue-text">{s}</span></li>)}</ul>
-          </div>
-          <div>
-            <h4>Navigation & Layout</h4>
-            <ul className="issues-list">{(strengths.navigation_layout || []).map((s, i) => <li key={i} className="issue"><span className="issue-text">{s}</span></li>)}</ul>
-          </div>
-          <div>
-            <h4>Technical Signals</h4>
-            <ul className="issues-list">{(strengths.technical_signals || []).map((s, i) => <li key={i} className="issue"><span className="issue-text">{s}</span></li>)}</ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="issues-summary">
-        <h3>Weaknesses</h3>
-        <div className="two-col">
-          <div>
-            <h4>Content Depth</h4>
-            <ul className="issues-list">{(weaknesses.content_depth || []).map((w, i) => <li key={i} className="issue"><span className="issue-text">{w}</span></li>)}</ul>
-          </div>
-          <div>
-            <h4>Authority & Trust</h4>
-            <ul className="issues-list">{(weaknesses.authority_trust || []).map((w, i) => <li key={i} className="issue"><span className="issue-text">{w}</span></li>)}</ul>
-          </div>
-          <div>
-            <h4>Semantic & Accessibility</h4>
-            <ul className="issues-list">{(weaknesses.semantic_accessibility || []).map((w, i) => <li key={i} className="issue"><span className="issue-text">{w}</span></li>)}</ul>
-          </div>
-          <div>
-            <h4>UX Friction</h4>
-            <ul className="issues-list">{(weaknesses.ux_friction || []).map((w, i) => <li key={i} className="issue"><span className="issue-text">{w}</span></li>)}</ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="issues-summary">
-        <h3>Implications for AEO</h3>
-        <p>{implications.overview}</p>
-        <ul className="issues-list">{(implications.bullets || []).map((b, i) => <li key={i} className="issue"><span className="issue-text">{b}</span></li>)}</ul>
-      </section>
-
-      <section className="issues-summary">
-        <h3>Recommendations</h3>
-        {recommendations.length > 0 ? (
-          <ul className="issues-list">
-            {recommendations.map((rec, i) => (
-              <li key={i} className="issue">
-                <span className="issue-text"><strong>[{rec.priority?.toUpperCase?.() || rec.priority}]</strong> {rec.action}</span>
-                <div className="meta-inline">Owner: {rec.owner} • Effort: {rec.effort} • Impact: {rec.impact}</div>
-                {rec.rationale && <div className="small-note">Why: {rec.rationale}</div>}
-                {Array.isArray(rec.success_metrics) && rec.success_metrics.length > 0 && (
-                  <div className="small-note">Success: {rec.success_metrics.join(', ')}</div>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No recommendations.</p>
-        )}
-      </section>
-
-      <section className="issues-summary">
-        <h3>Quick Win Checklist</h3>
-        {checklist.length > 0 ? (
-          <ul className="issues-list">
-            {checklist.map((c, i) => (
-              <li key={i} className="issue">
-                <span className="issue-text">{c.action}</span>
-                <div className="meta-inline">Status: {c.status} • Target: {c.target_metric}</div>
-                {c.why_it_matters && <div className="small-note">{c.why_it_matters}</div>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No checklist items.</p>
-        )}
-      </section>
-
-      <section className="issues-summary">
-        <h3>Analyzed Pages</h3>
-        {pageScores.length > 0 ? (
-          <ul className="issues-list">
-            {pageScores.map((pr, index) => (
-              <li key={index} className="issue">
-                <span className="issue-text">
-                  <a href={pr.url} target="_blank" rel="noreferrer">{pr.url}</a>
-                </span>
-                <span className="issue-priority">{pr.score}/100</span>
-                {Array.isArray(pr.key_observations) && pr.key_observations.length > 0 && (
-                  <ul className="sub-list">
-                    {pr.key_observations.map((o, j) => (
-                      <li key={j} className="issue"><span className="issue-text">{o}</span></li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No page-level details available.</p>
-        )}
-      </section>
-
-      <section className="issues-summary">
-        <h3>Bottom Line</h3>
-        <p>{reportData.bottom_line}</p>
-      </section>
-
-      <section className="issues-summary">
-        <h3>A/B Testing Plan</h3>
-        {abTests.length > 0 ? (
-          <ul className="issues-list">
-            {abTests.map((t, i) => (
-              <li key={i} className="issue">
-                <span className="issue-text"><strong>Hypothesis:</strong> {t.hypothesis}</span>
-                <div className="small-note">Changes: {(t.variant_changes || []).join(', ')}</div>
-                <div className="meta-inline">Primary: {t.primary_metric} • Secondary: {(t.secondary_metrics || []).join(', ')} • Duration: {t.duration_weeks} weeks</div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No A/B tests proposed.</p>
-        )}
-      </section>
-
-      <section className="issues-summary">
-        <h3>KPIs to Monitor</h3>
-        <ul className="issues-list">{(kpis || []).map((k, i) => <li key={i} className="issue"><span className="issue-text">{k}</span></li>)}</ul>
-      </section>
+      <AEOReportView data={reportData} />
 
       <div className="action-buttons">
         <h3>How would you like to proceed?</h3>
@@ -915,6 +872,7 @@ function App() {
         content_quality: result.content_quality,
         structure_optimization: result.structure_optimization,
         authority_trust: result.authority_trust,
+        ai_agent_compatibility: result.ai_agent_compatibility,
       });
       // no summary in new quick response
       setAnalysisId(result.analysis_id);

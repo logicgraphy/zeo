@@ -232,7 +232,7 @@ def build_aeo_prompt(content: dict) -> str:
     return (
         "You are an AEO (Answer Engine Optimization) auditor. "
         "Given the following webpage content, return a strict JSON object with this shape: "
-        "{\n  \"scores\": {\n    \"content_quality\": { \"score\": 1-5, \"reason\": string },\n    \"structure_optimization\": { \"score\": 1-5, \"reason\": string },\n    \"authority_trust\": { \"score\": 1-5, \"reason\": string }\n  }\n}\n"
+        "{\n  \"scores\": {\n    \"content_quality\": { \"score\": 1-5, \"reason\": string },\n    \"structure_optimization\": { \"score\": 1-5, \"reason\": string },\n    \"authority_trust\": { \"score\": 1-5, \"reason\": string },\n    \"ai_agent_compatibility\": { \"score\": 1-5, \"reason\": string }\n  }\n}\n"
         "Rules: "
         "- Use integers 1-5 only for scores."
         "- Keep reasons under 140 characters each."
@@ -361,7 +361,7 @@ def calculate_score_from_signals(
         # Derive an LLM numeric in [0,1] from category scores
         if llm_json and "scores" in llm_json:
             s = llm_json["scores"]
-            values = [s.get(k, {}).get("score") for k in ["content_quality", "structure_optimization", "authority_trust"]]
+            values = [s.get(k, {}).get("score") for k in ["content_quality", "structure_optimization", "authority_trust", "ai_agent_compatibility"]]
             values = [v for v in values if isinstance(v, int) and 1 <= v <= 5]
             llm_normalized = (sum(values) / (len(values) * 5)) if values else 0.5
         else:
@@ -381,7 +381,7 @@ def create_summary_from_analysis(url: str, llm_json: Dict[str, Any] | None, stru
     try:
         summary_parts = [
             f"Analyzed page: {url}.",
-            f"Structural AEO features score: {structural_scores.get('total_score', 0)}/4.",
+            f"Structural AI-optimization features score: {structural_scores.get('total_score', 0)}/5.",
         ]
 
         if llm_json and "scores" in llm_json:
@@ -391,15 +391,16 @@ def create_summary_from_analysis(url: str, llm_json: Dict[str, Any] | None, stru
                 return f"{data.get('score', '?')}/5 - {data.get('reason', '')}".strip()
 
             summary_parts.append(
-                "AEO review: "
+                "AI-optimization review: "
                 f"Content Quality: {reason_for('content_quality')}; "
                 f"Structure: {reason_for('structure_optimization')}; "
-                f"Authority: {reason_for('authority_trust')}"
+                f"Authority: {reason_for('authority_trust')}; "
+                f"AI Agent Compatibility: {reason_for('ai_agent_compatibility')}"
             )
 
         return " ".join(summary_parts)
     except Exception:
-        return f"AEO analysis completed for {url}."
+        return f"AI-optimization analysis completed for {url}."
 
 
 async def perform_full_site_analysis(analysis_id: str, start_url: str):
@@ -504,6 +505,7 @@ async def quick_analyze(req: QuickAnalyzeRequest):
             content_quality=to_category("content_quality"),
             structure_optimization=to_category("structure_optimization"),
             authority_trust=to_category("authority_trust"),
+            ai_agent_compatibility=to_category("ai_agent_compatibility"),
         )
 
     except HTTPException as he:
@@ -520,6 +522,7 @@ async def quick_analyze(req: QuickAnalyzeRequest):
             content_quality=CategoryScore(score=0, reason=default_reason),
             structure_optimization=CategoryScore(score=0, reason=default_reason),
             authority_trust=CategoryScore(score=0, reason=default_reason),
+            ai_agent_compatibility=CategoryScore(score=0, reason=default_reason),
         )
 
 
@@ -585,18 +588,18 @@ async def get_report(analysis_id: str):
     raw_lines.append("\nAggregate Summary:\n" + final_summary)
     raw_report = "\n".join(raw_lines)
 
-    # Format with LLM per strict JSON schema
+    # Format with LLM per slim schema (fewer tokens)
     prompt = (
-        "You are an expert AEO report formatter. Convert the following unstructured AEO report into STRICT JSON that matches the schema below. Do not include explanations, markdown, or code fences—return JSON ONLY.\n\n"
+        "Format INPUT_REPORT into STRICT JSON matching SCHEMA. Return JSON ONLY.\n\n"
         "INPUT_REPORT:\n{{RAW_REPORT}}\n\n"
-        "REQUIRED JSON SCHEMA (TypeShape):\n{\n  \"meta\": {\n    \"report_title\": \"string\",\n    \"scope\": \"string\",\n    \"analyzed_at\": \"string (ISO 8601 date)\",\n    \"overall_score\": \"number [0,100]\",\n    \"analyst\": \"string\",\n    \"tool_version\": \"string\"\n  },\n  \"executive_summary\": {\n    \"summary_paragraph\": \"string\",\n    \"highlights\": [\"string\", \"...\"]\n  },\n  \"overall_findings\": {\n    \"content_quality\": { \"score\": \"number [1,5]\", \"notes\": \"string\" },\n    \"structure\":       { \"score\": \"number [1,5]\", \"notes\": \"string\" },\n    \"authority_signals\": { \"score\": \"number [1,5]\", \"notes\": \"string\" },\n    \"impact\": \"string\",\n    \"common_themes\": [\"string\", \"...\"]\n  },\n  \"strengths\": {\n    \"brand_domain_trust\": [\"string\", \"...\"],\n    \"navigation_layout\": [\"string\", \"...\"],\n    \"technical_signals\": [\"string\", \"...\"]\n  },\n  \"weaknesses\": {\n    \"content_depth\": [\"string\", \"...\"],\n    \"authority_trust\": [\"string\", \"...\"],\n    \"semantic_accessibility\": [\"string\", \"...\"],\n    \"ux_friction\": [\"string\", \"...\"]\n  },\n  \"implications_for_aeo\": {\n    \"overview\": \"string\",\n    \"bullets\": [\"string\", \"...\"]\n  },\n  \"recommendations\": [\n    {\n      \"priority\": \"high|medium|long\",\n      \"action\": \"string\",\n      \"rationale\": \"string\",\n      \"owner\": \"content|engineering|seo|design|product|analytics\",\n      \"effort\": \"S|M|L\",\n      \"impact\": \"S|M|L\",\n      \"success_metrics\": [\"string\", \"...\"]\n    }\n  ],\n  \"quick_win_checklist\": [\n    {\n      \"action\": \"string\",\n      \"why_it_matters\": \"string\",\n      \"status\": \"todo|in_progress|done\",\n      \"target_metric\": \"string\"\n    }\n  ],\n  \"page_scores\": [\n    {\n      \"url\": \"string (absolute or hash-anchored)\",\n      \"score\": \"number [0,100]\",\n      \"key_observations\": [\"string\", \"...\"]\n    }\n  ],\n  \"bottom_line\": \"string\",\n  \"ab_testing_plan\": [\n    {\n      \"hypothesis\": \"string\",\n      \"variant_changes\": [\"string\", \"...\"],\n      \"primary_metric\": \"string\",\n      \"secondary_metrics\": [\"string\", \"...\"],\n      \"duration_weeks\": \"number\"\n    }\n  ],\n  \"kpis_to_monitor\": [\"string\", \"...\"]\n}\n\nTRANSFORMATION RULES:\n1) Populate all fields from INPUT_REPORT; if a field is missing, infer briefly (1–2 sentences) or use an empty array [] if truly not present. Never omit required top-level keys.\n2) Clamp numeric scores to schema ranges. Convert textual scores (e.g., “2/5”) to numbers.\n3) Use concise, stakeholder-friendly language. Bullet points should be short, actionable statements.\n4) Preserve page list and scores exactly when present; normalize URLs; carry forward any anchors.\n5) Keep \"recommendations\" prioritized and specific; assign likely \"owner\" and rough \"effort/impact\".\n6) Dates must be ISO 8601. If missing, set to today's date in UTC.\n7) Return VALID JSON ONLY. No comments, no trailing commas, no markdown.\n"
+        "SCHEMA:\n{\n  \"meta\": {\n    \"scope\": \"string\", \n    \"analyzed_at\": \"ISO 8601\", \n    \"overall_score\": \"0-100\", \n    \"analyst\": \"string\"\n  },\n  \"executive_summary\": {\n    \"summary_paragraph\": \"string\", \n    \"highlights\": [\"string\"]\n  },\n  \"overall_findings\": {\n    \"content_quality\": { \"score\": 1-5, \"notes\": \"string\" }, \n    \"structure\": { \"score\": 1-5, \"notes\": \"string\" }, \n    \"authority_signals\": { \"score\": 1-5, \"notes\": \"string\" }, \n    \"ai_agent_compatibility\": { \"score\": 1-5, \"notes\": \"string\" }, \n    \"impact\": \"string\", \n    \"common_themes\": [\"string\"]\n  },\n  \"strengths\": {\n    \"brand_domain_trust\": [\"string\"], \n    \"navigation_layout\": [\"string\"], \n    \"technical_signals\": [\"string\"]\n  },\n  \"weaknesses\": {\n    \"content_depth\": [\"string\"], \n    \"authority_trust\": [\"string\"], \n    \"semantic_accessibility\": [\"string\"], \n    \"ux_friction\": [\"string\"]\n  },\n  \"recommendations\": [{ \n    \"priority\": \"high|medium|long\", \n    \"action\": \"string\", \n    \"rationale\": \"string\", \n    \"owner\": \"content|engineering|seo|design|product|analytics\", \n    \"effort\": \"S|M|L\", \n    \"impact\": \"S|M|L\", \n    \"success_metrics\": [\"string\"] \n  }],\n  \"bottom_line\": \"string\"\n}\n\nRULES: Fill all fields concisely; infer briefly or []. Numbers must be in range. JSON only.\n"
     ).replace("{{RAW_REPORT}}", raw_report)
 
     def build_fallback() -> dict:
         today_iso = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
         return {
             "meta": {
-                "report_title": "AEO Site Report",
+                "report_title": "AI-optimization Site Report",
                 "scope": url,
                 "analyzed_at": today_iso,
                 "overall_score": average_score,
@@ -616,13 +619,8 @@ async def get_report(analysis_id: str):
             },
             "strengths": {"brand_domain_trust": [], "navigation_layout": [], "technical_signals": []},
             "weaknesses": {"content_depth": [], "authority_trust": [], "semantic_accessibility": [], "ux_friction": []},
-            "implications_for_aeo": {"overview": "", "bullets": []},
             "recommendations": [],
-            "quick_win_checklist": [],
-            "page_scores": [{"url": r["url"], "score": r["score"], "key_observations": []} for r in page_results],
-            "bottom_line": final_summary,
-            "ab_testing_plan": [],
-            "kpis_to_monitor": []
+            "bottom_line": final_summary
         }
 
     if not client:
@@ -635,13 +633,120 @@ async def get_report(analysis_id: str):
         )
         content = response.choices[0].message.content or "{}"
         data = json.loads(content)
-        # Validate against schema; if invalid, fallback below
+
+        # Build defaults to avoid empty fields
         try:
-            validated = AEOReport(**data)
-            return json.loads(validated.model_dump_json())
-        except Exception as ve:
-            print(f"Validation of LLM JSON failed: {ve}")
-            return build_fallback()
+            domain = urlparse(url).netloc
+        except Exception:
+            domain = url
+        today_iso = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        defaults = {
+            "meta": {
+                "report_title": "AI-optimization Site Report",
+                "scope": url,
+                "analyzed_at": today_iso,
+                "overall_score": average_score,
+                "analyst": "AI",
+                "tool_version": "1.0",
+            },
+            "executive_summary": {
+                "summary_paragraph": final_summary,
+                "highlights": [
+                    f"Average score: {average_score}/100",
+                    f"Pages analyzed: {len(page_results)}",
+                    f"Domain: {domain}",
+                ],
+            },
+            "overall_findings": {
+                "content_quality": {"score": 3, "notes": "Content depth varies across pages"},
+                "structure": {"score": 3, "notes": "Heading and section usage is inconsistent"},
+                "authority_signals": {"score": 3, "notes": "Explicit authorship/dates often missing"},
+                "ai_agent_compatibility": {"score": 3, "notes": "Limited structured cues for agent parsing and actions"},
+                "impact": "Addressing metadata, structure, and trust signals should improve discoverability and trust",
+                "common_themes": [
+                    "Inconsistent content depth",
+                    "Missing meta descriptions/titles on some pages",
+                    "Variable heading structure",
+                ],
+            },
+            "strengths": {
+                "brand_domain_trust": [f"Recognizable domain: {domain}"],
+                "navigation_layout": [],
+                "technical_signals": [],
+            },
+            "weaknesses": {
+                "content_depth": ["Some pages are thin or purely functional"],
+                "authority_trust": ["Lack of explicit authorship or dates"],
+                "semantic_accessibility": ["Headings and landmarks not consistently used"],
+                "ux_friction": ["Limited guidance on utility/policy pages"],
+            },
+            "recommendations": [
+                {
+                    "priority": "high",
+                    "action": "Add descriptive meta titles/descriptions and unique H1s",
+                    "rationale": "Improves clarity, CTR, and scannability",
+                    "owner": "seo",
+                    "effort": "S",
+                    "impact": "M",
+                    "success_metrics": ["% pages with meta description", "% pages with unique H1"],
+                }
+            ],
+            "bottom_line": final_summary,
+        }
+
+        def deep_merge(base: dict, overlay: dict) -> dict:
+            out = dict(base)
+            for k, v in (overlay or {}).items():
+                if isinstance(v, dict) and isinstance(out.get(k), dict):
+                    out[k] = deep_merge(out[k], v)
+                else:
+                    out[k] = v
+            return out
+
+        merged = deep_merge(defaults, data if isinstance(data, dict) else {})
+
+        # Coalesce empties: fill empty strings/arrays with defaults where applicable
+        es = merged.get("executive_summary", {})
+        if not es.get("summary_paragraph"):
+            es["summary_paragraph"] = final_summary
+        if not es.get("highlights"):
+            es["highlights"] = defaults["executive_summary"]["highlights"]
+        of = merged.get("overall_findings", {})
+        for key in ("content_quality", "structure", "authority_signals", "ai_agent_compatibility"):
+            sec = of.get(key, {})
+            if not sec.get("notes"):
+                sec["notes"] = defaults["overall_findings"][key]["notes"]
+            if not isinstance(sec.get("score"), int):
+                sec["score"] = 3
+            of[key] = sec
+        if not of.get("impact"):
+            of["impact"] = defaults["overall_findings"]["impact"]
+        if not of.get("common_themes"):
+            of["common_themes"] = defaults["overall_findings"]["common_themes"]
+        merged["overall_findings"] = of
+
+        for cat in ("brand_domain_trust", "navigation_layout", "technical_signals"):
+            if not merged.get("strengths", {}).get(cat):
+                merged.setdefault("strengths", {})[cat] = [] if cat != "brand_domain_trust" else defaults["strengths"]["brand_domain_trust"]
+        for cat in ("content_depth", "authority_trust", "semantic_accessibility", "ux_friction"):
+            if not merged.get("weaknesses", {}).get(cat):
+                merged.setdefault("weaknesses", {})[cat] = [defaults["weaknesses"][cat][0]]
+
+        if not merged.get("recommendations"):
+            merged["recommendations"] = defaults["recommendations"]
+        # Limit recommendations to at most 3 items
+        if isinstance(merged.get("recommendations"), list):
+            merged["recommendations"] = merged["recommendations"][:3]
+        if not merged.get("bottom_line"):
+            merged["bottom_line"] = final_summary
+
+        # Ensure meta.tool_version exists
+        merged.setdefault("meta", {})
+        merged["meta"].setdefault("tool_version", "1.0")
+
+        # Validate against schema
+        validated = AEOReport(**merged)
+        return json.loads(validated.model_dump_json())
     except Exception as e:
         print(f"Formatting failed, returning fallback schema: {e}")
         return build_fallback()
